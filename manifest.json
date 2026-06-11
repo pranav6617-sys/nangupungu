@@ -1,0 +1,17 @@
+{
+  "name": "Nangu Pangu",
+  "short_name": "NanguPangu",
+  "start_url": "/nangupungu/",
+  "scope": "/nangupungu/",
+  "display": "standalone",
+  "background_color": "#dd9530",
+  "theme_color": "#dd9530",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
