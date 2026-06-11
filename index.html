@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <!--
   NANGU PANGU · internet radio · folk-art stamp edition
-  Deploy: upload as index.html to a GitHub repo, enable Pages.
-  Add a station: one line in the STATIONS array.
-  Optional artwork: set img:"https://..." on a station to fill its stamp panel.
+  Deploy: upload as index.html to GitHub repo, enable Pages.
+  Add station: one object in STATIONS array.
+  Optional art: img:"https://..." fills the stamp panel.
 -->
 <html lang="en">
 <head>
@@ -12,17 +12,11 @@
 <title>नंगु पंगु · Nangu Pangu</title>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=Yatra+One&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --canvas:#dd9530;
-    --cream:#f4ecd8;
-    --ink:#2c1a10;
-    --bar:#33231a;
-  }
+  :root{--canvas:#dd9530;--cream:#f4ecd8;--bar:#33231a}
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html{overflow-x:hidden}
+  html,body{overflow-x:hidden}
   body{
     background:var(--canvas);
-    overflow-x:hidden;
     transition:background .7s ease;
     font-family:'Archivo','Helvetica Neue',Arial,sans-serif;
     color:var(--cream);
@@ -30,161 +24,183 @@
     max-width:560px;margin:0 auto;
   }
 
-  /* header */
+  /* ---- header ---- */
   header{
-    display:flex;align-items:stretch;justify-content:center;
+    display:flex;align-items:center;
     border:1px solid var(--cream);
-    max-width:340px;margin:6px auto 26px;
-    padding:10px 14px;
+    max-width:320px;margin:6px auto 26px;
+    padding:10px 14px;gap:14px;
   }
-  header .emblem{
-    flex:0 0 44px;display:flex;align-items:center;justify-content:center;
-    border:1px solid var(--cream);margin-right:14px;
+  .h-emblem{
+    flex:0 0 40px;height:40px;
+    border:1px solid var(--cream);
+    display:flex;align-items:center;justify-content:center;
   }
-  header .emblem svg{width:30px;height:30px;stroke:var(--cream);fill:none;stroke-width:1.3}
-  header .words{display:flex;flex-direction:column;justify-content:center;flex:1}
-  header .hin{
-    font-family:'Yatra One',serif;font-size:1.15rem;line-height:1.1;
-    letter-spacing:.12em;
+  .h-emblem svg{width:26px;height:26px;stroke:var(--cream);fill:none;stroke-width:1.4}
+  .h-hin{
+    font-family:'Yatra One',serif;font-size:1.15rem;
+    letter-spacing:.1em;line-height:1;
   }
 
-  /* grid */
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:26px 18px}
+  /* ---- grid ---- */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0,1fr));
+    gap:28px 16px;
+  }
 
-  .unit{cursor:pointer;user-select:none;transition:transform .12s ease}
+  /* ---- stamp card ---- */
+  .unit{
+    min-width:0;
+    cursor:pointer;user-select:none;
+    transition:transform .12s ease;
+  }
   .unit:active{transform:scale(.97)}
 
   .stamp{
     position:relative;
     background:var(--cream);
-    padding:11px;
-    box-shadow:0 10px 22px rgba(0,0,0,.32);
+    padding:10px;
+    border-radius:2px;
+    box-shadow:0 8px 20px rgba(0,0,0,.3);
     transition:box-shadow .3s ease;
   }
-  /* perforations */
-  .stamp::before,.stamp::after{
-    content:'';position:absolute;pointer-events:none;z-index:2;
-    transition:background .7s ease;
-  }
+
+  /* perforations — stay within bounds using mask on a canvas-coloured layer */
   .stamp::before{
-    top:0;bottom:0;left:-4.5px;right:-4.5px;
-    background-size:9px 16px;background-repeat:repeat-y;
-    background-position:left center, right center;
-    background-image:radial-gradient(circle 4.5px, var(--canvas) 98%, transparent 100%),
-                     radial-gradient(circle 4.5px, var(--canvas) 98%, transparent 100%);
+    content:'';
+    position:absolute;inset:0;
+    z-index:3;pointer-events:none;
+    background:var(--canvas);
+    transition:background .7s ease;
+    -webkit-mask-image:
+      radial-gradient(circle,#000 40%,transparent 42%),
+      radial-gradient(circle,#000 40%,transparent 42%),
+      radial-gradient(circle,#000 40%,transparent 42%),
+      radial-gradient(circle,#000 40%,transparent 42%);
+    -webkit-mask-size:14px 10px,14px 10px,10px 14px,10px 14px;
+    -webkit-mask-position:top center,bottom center,left center,right center;
+    -webkit-mask-repeat:repeat-x,repeat-x,repeat-y,repeat-y;
+    -webkit-mask-composite:source-over;
+    mask-image:
+      radial-gradient(circle,#000 40%,transparent 42%),
+      radial-gradient(circle,#000 40%,transparent 42%),
+      radial-gradient(circle,#000 40%,transparent 42%),
+      radial-gradient(circle,#000 40%,transparent 42%);
+    mask-size:14px 10px,14px 10px,10px 14px,10px 14px;
+    mask-position:top center,bottom center,left center,right center;
+    mask-repeat:repeat-x,repeat-x,repeat-y,repeat-y;
+    mask-composite:add;
   }
-  .stamp::after{
-    left:0;right:0;top:-4.5px;bottom:-4.5px;
-    background-size:16px 9px;background-repeat:repeat-x;
-    background-position:center top, center bottom;
-    background-image:radial-gradient(circle 4.5px, var(--canvas) 98%, transparent 100%),
-                     radial-gradient(circle 4.5px, var(--canvas) 98%, transparent 100%);
-  }
+
+  .unit.lit .stamp{box-shadow:0 12px 28px rgba(0,0,0,.4),0 0 0 2px var(--cream)}
+  .unit.loading .stamp{box-shadow:0 8px 20px rgba(0,0,0,.3),0 0 0 2px rgba(244,236,216,.4)}
+
+  /* ---- stamp panel ---- */
   .panel{
     position:relative;overflow:hidden;
     background:var(--p);
-    border-radius:10px;
-    min-height:168px;
+    border-radius:8px;
+    min-height:140px;
     display:flex;flex-direction:column;
   }
   .panel img.art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .panel svg.orn{
     position:absolute;inset:0;width:100%;height:100%;
-    stroke:var(--cream);fill:none;opacity:.55;
+    stroke:rgba(255,255,255,.5);fill:none;stroke-width:1;
   }
   .banner{
     position:relative;z-index:2;align-self:center;
-    margin-top:10px;max-width:92%;
-    background:rgba(0,0,0,.28);
+    margin:10px 6px 0;
+    background:rgba(0,0,0,.3);
     border-radius:99px;
-    padding:5px 12px;
-    font-size:.6rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
-    text-align:center;color:var(--cream);
+    padding:4px 10px;
+    font-size:.55rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--cream);
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    max-width:90%;text-align:center;
   }
   .plate{
-    position:absolute;right:0;bottom:14px;z-index:2;
+    position:absolute;right:0;bottom:10px;z-index:2;
     background:rgba(0,0,0,.45);color:var(--cream);
-    font-size:.55rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
-    padding:5px 10px 5px 12px;
-    border-radius:4px 0 0 4px;
+    font-size:.5rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+    padding:4px 8px 4px 10px;border-radius:3px 0 0 3px;
+    white-space:nowrap;
   }
   .onair{
-    position:absolute;left:10px;top:10px;z-index:2;
-    width:10px;height:10px;border-radius:50%;
+    position:absolute;left:8px;top:8px;z-index:2;
+    width:8px;height:8px;border-radius:50%;
     background:var(--cream);opacity:0;transition:opacity .2s;
   }
   .unit.lit .onair{opacity:1;animation:pulse 1.6s ease-in-out infinite}
-  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.55);opacity:.5}}
-  .unit.lit .stamp{box-shadow:0 14px 30px rgba(0,0,0,.45), 0 0 0 2px var(--cream)}
-  .unit.loading .stamp{box-shadow:0 10px 22px rgba(0,0,0,.32), 0 0 0 2px rgba(244,236,216,.5)}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.5);opacity:.4}}
 
+  /* ---- now playing line under stamp ---- */
   .below{
-    margin-top:9px;text-align:center;min-height:1.1em;
-    font-size:.58rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
-    color:var(--cream);
+    margin-top:7px;
+    font-size:.52rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--cream);opacity:.85;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    text-align:center;min-height:1em;
   }
-  .below.dead{opacity:.75}
+  .below.dead{opacity:.6}
 
-  /* bar */
+  /* ---- sticky bar ---- */
   .bar{
     position:fixed;left:0;right:0;bottom:0;z-index:10;
     background:var(--bar);
     transition:background .7s ease;
-    display:flex;align-items:center;gap:14px;
+    display:flex;align-items:center;gap:12px;
     padding:12px 16px calc(12px + env(safe-area-inset-bottom));
     max-width:560px;margin:0 auto;
-    box-shadow:0 -8px 24px rgba(0,0,0,.35);
+    box-shadow:0 -6px 20px rgba(0,0,0,.4);
   }
-  .bar .emblem{
-    flex:0 0 46px;height:46px;
-    border:1px solid var(--cream);
+  .b-emblem{
+    flex:0 0 44px;height:44px;
+    border:1px solid rgba(244,236,216,.7);
     display:flex;align-items:center;justify-content:center;
   }
-  .bar .emblem svg{width:30px;height:30px;stroke:var(--cream);fill:none;stroke-width:1.3}
-  .bar .divider{width:1px;align-self:stretch;background:var(--cream);opacity:.6}
-  .bar .info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
-  .bar .st-name{
-    font-size:.78rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;
+  .b-emblem svg{width:28px;height:28px;stroke:var(--cream);fill:none;stroke-width:1.3}
+  .b-div{width:1px;align-self:stretch;background:rgba(244,236,216,.5)}
+  .b-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+  .b-name{
+    font-size:.75rem;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cream);
   }
-  .bar .rule{height:1px;background:var(--cream);opacity:.55;margin:5px 0}
-  .bar .st-sub{
-    font-size:.55rem;font-weight:500;letter-spacing:.22em;text-transform:uppercase;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cream);
+  .b-rule{height:1px;background:rgba(244,236,216,.45);margin:4px 0}
+  .b-sub{
+    font-size:.52rem;font-weight:500;letter-spacing:.2em;text-transform:uppercase;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cream);opacity:.85;
   }
   .pp{
-    width:62px;height:62px;border-radius:50%;flex:0 0 62px;
-    background:transparent;border:1.5px solid var(--cream);
+    width:60px;height:60px;border-radius:50%;flex:0 0 60px;
+    background:transparent;border:1.5px solid rgba(244,236,216,.8);
     display:flex;align-items:center;justify-content:center;cursor:pointer;
   }
-  .pp:active{transform:scale(.93)}
-  .pp svg{width:24px;height:24px;fill:var(--cream)}
+  .pp:active{transform:scale(.92)}
+  .pp svg{width:22px;height:22px;fill:var(--cream)}
 </style>
 </head>
 <body>
 
 <header>
-  <div class="emblem">
-    <svg viewBox="0 0 32 32"><path d="M16 4 C13 9 8 11 8 17 a8 8 0 0 0 16 0 C24 11 19 9 16 4 Z M16 10 v16 M11 14 c0 6 2 10 5 12 M21 14 c0 6 -2 10 -5 12"/></svg>
+  <div class="h-emblem">
+    <svg viewBox="0 0 32 32"><path d="M16 4 C13 9 8 11 8 17 a8 8 0 0 0 16 0 C24 11 19 9 16 4Z M16 10 v16 M11 14 c0 6 2 10 5 12 M21 14 c0 6 -2 10 -5 12"/></svg>
   </div>
-  <div class="words">
-    <div class="hin">नंगु पंगु</div>
-  </div>
+  <div class="h-hin">नंगु पंगु</div>
 </header>
 
 <div class="grid" id="grid"></div>
 
 <div class="bar">
-  <div class="emblem">
-    <svg viewBox="0 0 32 32"><rect x="5" y="12" width="22" height="13" rx="2"/><path d="M8 12 L24 5 M10 17 h6 M10 20 h6"/><circle cx="21.5" cy="18.5" r="3.2"/></svg>
+  <div class="b-emblem">
+    <svg viewBox="0 0 32 32"><rect x="5" y="12" width="22" height="13" rx="2"/><path d="M8 12 L24 5 M10 17h6 M10 20h6"/><circle cx="21.5" cy="18.5" r="3.2"/></svg>
   </div>
-  <div class="divider"></div>
-  <div class="info">
-    <div class="st-name" id="barName">Nangu Pangu</div>
-    <div class="rule"></div>
-    <div class="st-sub" id="barSub">Nothing playing</div>
+  <div class="b-div"></div>
+  <div class="b-info">
+    <div class="b-name" id="bName">Nangu Pangu</div>
+    <div class="b-rule"></div>
+    <div class="b-sub" id="bSub">Nothing playing</div>
   </div>
   <button class="pp" id="ppBtn" aria-label="Play or pause">
     <svg id="ppIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
@@ -195,60 +211,65 @@
 
 <script>
 const STATIONS = [
-  {name:"Radio Alhara",   city:"Bethlehem", canvas:"#9a3324", p:"#e06a50", bar:"#7c2418",
-   url:"https://stream.radiojar.com/78cxy6wkxtzuv",          meta:{type:"radiojar",  key:"78cxy6wkxtzuv"}},
-  {name:"Oroko Radio",    city:"Accra",     canvas:"#5b3a21", p:"#eda73c", bar:"#462c17",
-   url:"https://oroko-radio.radiocult.fm/stream",             meta:{type:"radiocult", key:"oroko-radio"}},
-  {name:"20ft Radio",     city:"Kyiv",      canvas:"#0f7a55", p:"#f2c12e", bar:"#0a5f41",
-   url:"https://20ft-radio.radiocult.fm/stream",              meta:{type:"radiocult", key:"20ft-radio"}},
-  {name:"NTS 1",          city:"London",    canvas:"#262626", p:"#f2c12e", bar:"#171717",
-   url:"https://stream-relay-geo.ntslive.net/stream",         meta:{type:"nts",       key:0}},
-  {name:"NTS 2",          city:"London",    canvas:"#3a2e75", p:"#9dbf5e", bar:"#2c2259",
-   url:"https://stream-relay-geo.ntslive.net/stream2",        meta:{type:"nts",       key:1}},
-  {name:"Mutant Radio",   city:"Tbilisi",   canvas:"#c2541e", p:"#119181", bar:"#9c4116",
-   url:"https://listen.radioking.com/radio/282820/stream/328621", meta:{type:"radioking", key:"mutant-radio"}},
-  {name:"Worldwide FM",   city:"London",    canvas:"#b85c66", p:"#2aa3a0", bar:"#94454e",
-   url:"https://worldwide-fm.radiocult.fm/stream",            meta:{type:"radiocult", key:"worldwide-fm"}},
-  {name:"Norrm Radio",    city:"Bandung",   canvas:"#6b4226", p:"#efa63b", bar:"#54331d",
-   url:"https://listen.norrm.com/default",                    meta:{type:"icecast",   key:"https://listen.norrm.com/status-json.xsl"}}
+  {name:"Radio Alhara",  city:"Bethlehem", canvas:"#9a3324", p:"#e06a50", bar:"#7c2418",
+   url:"https://stream.radiojar.com/78cxy6wkxtzuv",             meta:{type:"radiojar",  id:"78cxy6wkxtzuv"}},
+  {name:"Oroko Radio",   city:"Accra",     canvas:"#5b3a21", p:"#eda73c", bar:"#462c17",
+   url:"https://oroko-radio.radiocult.fm/stream",                meta:{type:"radiocult", id:"oroko-radio"}},
+  {name:"20ft Radio",    city:"Kyiv",      canvas:"#0f7a55", p:"#f2c12e", bar:"#0a5f41",
+   url:"https://20ft-radio.radiocult.fm/stream",                 meta:{type:"radiocult", id:"20ft-radio"}},
+  {name:"NTS 1",         city:"London",    canvas:"#262626", p:"#f2c12e", bar:"#171717",
+   url:"https://stream-relay-geo.ntslive.net/stream",            meta:{type:"nts",       id:0}},
+  {name:"NTS 2",         city:"London",    canvas:"#3a2e75", p:"#9dbf5e", bar:"#2c2259",
+   url:"https://stream-relay-geo.ntslive.net/stream2",           meta:{type:"nts",       id:1}},
+  {name:"Mutant Radio",  city:"Tbilisi",   canvas:"#c2541e", p:"#119181", bar:"#9c4116",
+   url:"https://listen.radioking.com/radio/282820/stream/328621",meta:{type:"radioking", id:"mutant-radio"}},
+  {name:"Worldwide FM",  city:"London",    canvas:"#b85c66", p:"#2aa3a0", bar:"#94454e",
+   url:"https://worldwide-fm.radiocult.fm/stream",               meta:{type:"radiocult", id:"worldwide-fm"}},
+  {name:"Norrm Radio",   city:"Bandung",   canvas:"#6b4226", p:"#efa63b", bar:"#54331d",
+   url:"https://listen.norrm.com/default",                       meta:{type:"icecast",   id:"https://listen.norrm.com/status-json.xsl"}}
 ];
 
 const DEFAULT_CANVAS="#dd9530", DEFAULT_BAR="#33231a";
 const root=document.documentElement;
 const grid=document.getElementById('grid');
 const player=document.getElementById('player');
-const barName=document.getElementById('barName');
-const barSub=document.getElementById('barSub');
+const bName=document.getElementById('bName');
+const bSub=document.getElementById('bSub');
 const ppIcon=document.getElementById('ppIcon');
 const PLAY='M8 5v14l11-7z', PAUSE='M6 5h4v14H6zM14 5h4v14h-4z';
-const ORN=`<svg class="orn" viewBox="0 0 100 100" preserveAspectRatio="none" stroke-width="1">
-  <path d="M8 14 q8 -8 14 0 q-8 6 -14 0 Z M6 26 q6 6 0 12"/>
-  <path d="M92 14 q-8 -8 -14 0 q8 6 14 0 Z M94 26 q-6 6 0 12"/>
-  <path d="M12 88 q10 -6 16 2 M88 88 q-10 -6 -16 2"/>
-  <path d="M20 8 a34 34 0 0 1 60 0" stroke-dasharray="2 4"/>
-  <circle cx="14" cy="50" r="1.2" fill="#f4ecd8" stroke="none"/>
-  <circle cx="86" cy="50" r="1.2" fill="#f4ecd8" stroke="none"/>
-  <circle cx="22" cy="66" r="1.2" fill="#f4ecd8" stroke="none"/>
-  <circle cx="78" cy="66" r="1.2" fill="#f4ecd8" stroke="none"/>
+
+const ORN=`<svg class="orn" viewBox="0 0 100 120" preserveAspectRatio="none">
+  <path d="M10 16 q7-7 13 0 q-7 5-13 0Z" stroke-width="1.2"/>
+  <path d="M8 28 q5 5 0 11" stroke-width="1.2"/>
+  <path d="M90 16 q-7-7-13 0 q7 5 13 0Z" stroke-width="1.2"/>
+  <path d="M92 28 q-5 5 0 11" stroke-width="1.2"/>
+  <path d="M14 96 q9-5 14 2" stroke-width="1.2"/>
+  <path d="M86 96 q-9-5-14 2" stroke-width="1.2"/>
+  <path d="M22 8 a32 32 0 0 1 56 0" stroke-dasharray="2 4" stroke-width="1"/>
+  <circle cx="15" cy="56" r="1.4" fill="rgba(255,255,255,.5)" stroke="none"/>
+  <circle cx="85" cy="56" r="1.4" fill="rgba(255,255,255,.5)" stroke="none"/>
+  <circle cx="24" cy="76" r="1.4" fill="rgba(255,255,255,.5)" stroke="none"/>
+  <circle cx="76" cy="76" r="1.4" fill="rgba(255,255,255,.5)" stroke="none"/>
 </svg>`;
 
 let current=-1;
 const boxes=[];
 const nowText=STATIONS.map(()=>'');
 
+/* build grid */
 STATIONS.forEach((s,i)=>{
   const el=document.createElement('div');
   el.className='unit';
   el.innerHTML=`
     <div class="stamp">
-      <div class="panel" style="--p:${s.p};background:${s.p}">
+      <div class="panel" style="background:${s.p}">
         ${s.img?`<img class="art" src="${s.img}" alt="">`:ORN}
         <div class="banner">${s.name}</div>
         <div class="plate">${s.city}</div>
         <div class="onair"></div>
       </div>
     </div>
-    <div class="below" id="below-${i}"></div>`;
+    <div class="below" id="bl-${i}"></div>`;
   el.addEventListener('click',()=>strike(i));
   grid.appendChild(el);
   boxes.push(el);
@@ -257,89 +278,82 @@ STATIONS.forEach((s,i)=>{
 function strike(i){
   if(i===current&&!player.paused){pause();return}
   if(i===current&&player.paused){resume();return}
-  setUnit(i,'loading');setBelow(i,'Striking…',false);
-  if(current>=0&&current!==i){setUnit(current,'');refreshBelow(current)}
+  cls(i,'loading');setBelow(i,'Striking…',false);
+  if(current>=0&&current!==i){cls(current,'');refreshBelow(current)}
   current=i;
   player.src=STATIONS[i].url;
-  player.play().catch(()=>deadAir(i));
-  paintWorld(i);updateBar();
+  player.play().catch(()=>dead(i));
+  paint(i);bar();
 }
 function pause(){player.pause()}
-function resume(){if(current<0)return;player.play().catch(()=>deadAir(current))}
-function deadAir(i){setUnit(i,'');setBelow(i,'Dead air',true)}
+function resume(){if(current<0)return;player.play().catch(()=>dead(current))}
+function dead(i){cls(i,'');setBelow(i,'Dead air',true)}
 
 document.getElementById('ppBtn').addEventListener('click',()=>{
   if(current<0)return;
   player.paused?resume():pause();
 });
 
-function paintWorld(i){
+function paint(i){
   const s=i>=0?STATIONS[i]:null;
   root.style.setProperty('--canvas',s?s.canvas:DEFAULT_CANVAS);
   root.style.setProperty('--bar',s?s.bar:DEFAULT_BAR);
 }
 
 player.addEventListener('playing',()=>{
-  setUnit(current,'lit');refreshBelow(current);
+  cls(current,'lit');refreshBelow(current);
   ppIcon.innerHTML=`<path d="${PAUSE}"/>`;
-  updateBar();mediaSession();
+  bar();msession();
 });
 player.addEventListener('pause',()=>{
-  if(current>=0){setUnit(current,'');refreshBelow(current)}
+  if(current>=0){cls(current,'');refreshBelow(current)}
   ppIcon.innerHTML=`<path d="${PLAY}"/>`;
-  if(current>=0)barSub.textContent='Paused';
+  if(current>=0)bSub.textContent='Paused';
 });
-player.addEventListener('waiting',()=>{if(current>=0)setUnit(current,'loading')});
-player.addEventListener('error',()=>{if(current>=0){deadAir(current);ppIcon.innerHTML=`<path d="${PLAY}"/>`}});
+player.addEventListener('waiting',()=>{if(current>=0)cls(current,'loading')});
+player.addEventListener('error',()=>{if(current>=0){dead(current);ppIcon.innerHTML=`<path d="${PLAY}"/>`}});
 
-function setUnit(i,cls){
-  boxes[i].classList.remove('lit','loading');
-  if(cls)boxes[i].classList.add(cls);
-}
-function setBelow(i,text,dim){
-  const el=document.getElementById('below-'+i);
-  el.textContent=text;el.classList.toggle('dead',!!dim);
-}
+function cls(i,c){boxes[i].classList.remove('lit','loading');if(c)boxes[i].classList.add(c)}
+function setBelow(i,t,dim){const el=document.getElementById('bl-'+i);el.textContent=t;el.classList.toggle('dead',!!dim)}
 function refreshBelow(i){setBelow(i,nowText[i]||'',false)}
-function updateBar(){
+function bar(){
   if(current<0)return;
-  barName.textContent=STATIONS[current].name;
-  barSub.textContent=nowText[current]?'Now playing — '+nowText[current]:'Nothing playing';
+  bName.textContent=STATIONS[current].name;
+  bSub.textContent=nowText[current]?'Now playing — '+nowText[current]:'Nothing playing';
 }
-function mediaSession(){
+function msession(){
   if(!('mediaSession'in navigator)||current<0)return;
   const s=STATIONS[current];
-  navigator.mediaSession.metadata=new MediaMetadata({
-    title:nowText[current]||s.name,artist:'Nangu Pangu · '+s.city
-  });
+  navigator.mediaSession.metadata=new MediaMetadata({title:nowText[current]||s.name,artist:'Nangu Pangu · '+s.city});
   navigator.mediaSession.setActionHandler('play',resume);
   navigator.mediaSession.setActionHandler('pause',pause);
 }
 
-const j=u=>fetch(u).then(r=>r.json());
-const FETCHERS={
-  nts:async key=>{const d=await j('https://www.nts.live/api/v2/live');return d.results?.[key]?.now?.broadcast_title||''},
-  radiocult:async key=>{const d=await j(`https://api.radiocult.fm/api/station/${key}/schedule/live`);const r=d.result||d;return r?.content?.title||r?.metadata?.title||r?.title||''},
-  radiojar:async key=>{const d=await j(`https://www.radiojar.com/api/stations/${key}/now_playing/`);return[d.artist,d.title].filter(Boolean).join(' — ')||''},
-  radioking:async key=>{const d=await j(`https://api.radioking.io/widget/radio/${key}/track/current`);return[d.artist,d.title].filter(Boolean).join(' — ')||''},
-  icecast:async key=>{const d=await j(key);let s=d.icestats?.source;if(Array.isArray(s))s=s[0];return s?.title||s?.server_name||''}
+/* now-playing fetchers */
+const jf=u=>fetch(u).then(r=>r.json());
+const FETCH={
+  nts:    async id=>{const d=await jf('https://www.nts.live/api/v2/live');return d.results?.[id]?.now?.broadcast_title||''},
+  radiocult:async id=>{const d=await jf(`https://api.radiocult.fm/api/station/${id}/schedule/live`);const r=d.result||d;return r?.content?.title||r?.metadata?.title||r?.title||''},
+  radiojar: async id=>{const d=await jf(`https://www.radiojar.com/api/stations/${id}/now_playing/`);return[d.artist,d.title].filter(Boolean).join(' — ')||''},
+  radioking:async id=>{const d=await jf(`https://api.radioking.io/widget/radio/${id}/track/current`);return[d.artist,d.title].filter(Boolean).join(' — ')||''},
+  icecast:  async id=>{const d=await jf(id);let s=d.icestats?.source;if(Array.isArray(s))s=s[0];return s?.title||s?.server_name||''}
 };
-
-async function pollAll(){
+async function poll(){
   await Promise.all(STATIONS.map(async(s,i)=>{
     if(!s.meta)return;
     try{
-      const t=await FETCHERS[s.meta.type](s.meta.key);
+      const t=await FETCH[s.meta.type](s.meta.id);
       if(typeof t==='string'){
         nowText[i]=t.trim();
-        if(!boxes[i].classList.contains('loading')&&document.getElementById('below-'+i).textContent!=='Dead air')refreshBelow(i);
-        if(i===current&&!player.paused)updateBar();
+        const el=document.getElementById('bl-'+i);
+        if(el&&el.textContent!=='Dead air'&&!boxes[i].classList.contains('loading'))refreshBelow(i);
+        if(i===current&&!player.paused)bar();
       }
     }catch(e){}
   }));
 }
-pollAll();
-setInterval(pollAll,60000);
+poll();
+setInterval(poll,60000);
 </script>
 </body>
 </html>
