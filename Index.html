@@ -1,1 +1,421 @@
+<!DOCTYPE html>
+<!--
+  NANGU PANGU · internet radio · folk-art stamp edition
+  Deploy: upload as index.html to a GitHub repo, enable Pages.
+  Add a station: one line in the STATIONS array.
+  Optional artwork: set img:"https://..." on a station to fill its stamp panel.
+  NOTE: streams + APIs will NOT work inside the Claude artifact sandbox
+  (network blocked). Save locally and open, or deploy — then everything runs.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>नंगु पंगु · Nangu Pangu</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700&family=Yatra+One&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --canvas:#dd9530;       /* page colour — changes per playing station */
+    --cream:#f4ecd8;
+    --ink:#2c1a10;
+    --bar:#33231a;          /* bar colour — flips per playing station */
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{
+    background:var(--canvas);
+    transition:background .7s ease;
+    font-family:'Archivo','Helvetica Neue',Arial,sans-serif;
+    color:var(--cream);
+    padding:18px 16px 110px;
+    max-width:560px;margin:0 auto;
+  }
 
+  /* ---------- header : thin-line boxed mark ---------- */
+  header{
+    display:flex;align-items:stretch;justify-content:center;gap:0;
+    border:1px solid var(--cream);
+    max-width:340px;margin:6px auto 26px;
+    padding:10px 14px;
+  }
+  header .emblem{
+    flex:0 0 44px;display:flex;align-items:center;justify-content:center;
+    border:1px solid var(--cream);margin-right:14px;
+  }
+  header .emblem svg{width:30px;height:30px;stroke:var(--cream);fill:none;stroke-width:1.3}
+  header .words{display:flex;flex-direction:column;justify-content:center;flex:1}
+  header .hin{
+    font-family:'Yatra One',serif;font-size:1.15rem;line-height:1.1;
+    letter-spacing:.12em;
+  }
+  header .rule{height:1px;background:var(--cream);opacity:.7;margin:6px 0}
+  header .sub{
+    font-size:.55rem;letter-spacing:.34em;text-transform:uppercase;
+  }
+
+  /* ---------- grid of stamps ---------- */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:26px 18px}
+
+  .unit{cursor:pointer;user-select:none;transition:transform .12s ease}
+  .unit:active{transform:scale(.97)}
+
+  .stamp{
+    position:relative;
+    background:var(--cream);
+    padding:11px;
+    box-shadow:0 10px 22px rgba(0,0,0,.32);
+    transition:box-shadow .3s ease;
+  }
+  /* perforations — punched in the live canvas colour so they track bg changes */
+  .stamp::before,.stamp::after{
+    content:'';position:absolute;pointer-events:none;z-index:2;
+    background-image:radial-gradient(circle 4.5px, var(--canvas) 98%, transparent 100%);
+    transition:background .7s ease;
+  }
+  .stamp::before{ /* left + right columns */
+    top:0;bottom:0;left:-4.5px;right:-4.5px;
+    background-size:9px 16px;background-repeat:repeat-y;
+    background-position:left center, right center;
+    background-image:radial-gradient(circle 4.5px, var(--canvas) 98%, transparent 100%),
+                     radial-gradient(circle 4.5px, var(--canvas) 98%, transparent 100%);
+  }
+  .stamp::after{ /* top + bottom rows */
+    left:0;right:0;top:-4.5px;bottom:-4.5px;
+    background-size:16px 9px;background-repeat:repeat-x;
+    background-position:center top, center bottom;
+    background-image:radial-gradient(circle 4.5px, var(--canvas) 98%, transparent 100%),
+                     radial-gradient(circle 4.5px, var(--canvas) 98%, transparent 100%);
+  }
+  .panel{
+    position:relative;overflow:hidden;
+    background:var(--p);
+    border-radius:10px;
+    min-height:168px;
+    display:flex;flex-direction:column;
+  }
+  .panel img.art{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  }
+  .panel svg.orn{
+    position:absolute;inset:0;width:100%;height:100%;
+    stroke:var(--cream);fill:none;opacity:.55;
+  }
+  .banner{
+    position:relative;z-index:2;align-self:center;
+    margin-top:10px;max-width:92%;
+    background:rgba(0,0,0,.28);
+    border-radius:99px;
+    padding:5px 12px;
+    font-size:.6rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+    text-align:center;color:var(--cream);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .plate{
+    position:absolute;right:0;bottom:14px;z-index:2;
+    background:rgba(0,0,0,.45);
+    color:var(--cream);
+    font-size:.55rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+    padding:5px 10px 5px 12px;
+    border-radius:4px 0 0 4px;
+  }
+  .onair{
+    position:absolute;left:10px;top:10px;z-index:2;
+    width:10px;height:10px;border-radius:50%;
+    background:var(--cream);
+    opacity:0;transition:opacity .2s;
+  }
+  .unit.lit .onair{opacity:1;animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.55);opacity:.5}}
+  .unit.lit .stamp{box-shadow:0 14px 30px rgba(0,0,0,.45), 0 0 0 2px var(--cream)}
+  .unit.loading .stamp{box-shadow:0 10px 22px rgba(0,0,0,.32), 0 0 0 2px rgba(244,236,216,.5)}
+
+  /* under-stamp line: now playing, same font family as banner */
+  .below{
+    margin-top:9px;text-align:center;min-height:1.1em;
+    font-size:.58rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--cream);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .below.dead{opacity:.75}
+
+  footer{
+    text-align:center;margin-top:30px;
+  }
+  footer .mark{
+    display:inline-block;border:1px solid var(--cream);
+    font-size:.5rem;letter-spacing:.3em;text-transform:uppercase;
+    padding:6px 14px;
+  }
+
+  /* ---------- bar ---------- */
+  .bar{
+    position:fixed;left:0;right:0;bottom:0;z-index:10;
+    background:var(--bar);
+    transition:background .7s ease;
+    display:flex;align-items:center;gap:14px;
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+    max-width:560px;margin:0 auto;
+    box-shadow:0 -8px 24px rgba(0,0,0,.35);
+  }
+  .bar .emblem{
+    flex:0 0 46px;height:46px;
+    border:1px solid var(--cream);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .bar .emblem svg{width:30px;height:30px;stroke:var(--cream);fill:none;stroke-width:1.3}
+  .bar .divider{width:1px;align-self:stretch;background:var(--cream);opacity:.6}
+  .bar .info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+  .bar .st-name{
+    font-size:.78rem;font-weight:700;letter-spacing:.22em;text-transform:uppercase;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cream);
+  }
+  .bar .rule{height:1px;background:var(--cream);opacity:.55;margin:5px 0}
+  .bar .st-sub{
+    font-size:.55rem;font-weight:500;letter-spacing:.22em;text-transform:uppercase;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cream);
+  }
+  .pp{
+    width:62px;height:62px;border-radius:50%;flex:0 0 62px;
+    background:transparent;
+    border:1.5px solid var(--cream);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;
+  }
+  .pp:active{transform:scale(.93)}
+  .pp svg{width:24px;height:24px;fill:var(--cream)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="emblem">
+    <svg viewBox="0 0 32 32"><path d="M16 4 C13 9 8 11 8 17 a8 8 0 0 0 16 0 C24 11 19 9 16 4 Z M16 10 v16 M11 14 c0 6 2 10 5 12 M21 14 c0 6 -2 10 -5 12"/></svg>
+  </div>
+  <div class="words">
+    <div class="hin">नंगु पंगु</div>
+    <div class="rule"></div>
+    <div class="sub">Fine Internet Radio</div>
+  </div>
+</header>
+
+<div class="grid" id="grid"></div>
+
+<footer><span class="mark">Nangu Pangu · Nine Stations · No Adverts</span></footer>
+
+<div class="bar">
+  <div class="emblem">
+    <svg viewBox="0 0 32 32"><rect x="5" y="12" width="22" height="13" rx="2"/><path d="M8 12 L24 5 M10 17 h6 M10 20 h6"/><circle cx="21.5" cy="18.5" r="3.2"/></svg>
+  </div>
+  <div class="divider"></div>
+  <div class="info">
+    <div class="st-name" id="barName">Nangu Pangu</div>
+    <div class="rule"></div>
+    <div class="st-sub" id="barSub">Nothing playing</div>
+  </div>
+  <button class="pp" id="ppBtn" aria-label="Play or pause">
+    <svg id="ppIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+  </button>
+</div>
+
+<audio id="player" preload="none"></audio>
+
+<script>
+/* ========== STATIONS — one line each. Optional img:"url" fills the panel. ==========
+   meta: how to fetch now-playing. types: nts | radiocult | radiojar | radioking | airtime | icecast */
+const STATIONS = [
+  {name:"Radio Alhara", city:"Bethlehem", canvas:"#9a3324", p:"#e06a50", bar:"#7c2418",
+   url:"https://stream.radiojar.com/78cxy6wkxtzuv", meta:{type:"radiojar", key:"78cxy6wkxtzuv"}},
+  {name:"Oroko Radio", city:"Accra", canvas:"#5b3a21", p:"#eda73c", bar:"#462c17",
+   url:"https://oroko-radio.radiocult.fm/stream", meta:{type:"radiocult", key:"oroko-radio"}},
+  {name:"20ft Radio", city:"Kyiv", canvas:"#0f7a55", p:"#f2c12e", bar:"#0a5f41",
+   url:"https://20ft-radio.radiocult.fm/stream", meta:{type:"radiocult", key:"20ft-radio"}},
+  {name:"NTS 1", city:"London", canvas:"#262626", p:"#f2c12e", bar:"#171717",
+   url:"https://stream-relay-geo.ntslive.net/stream", meta:{type:"nts", key:0}},
+  {name:"NTS 2", city:"London", canvas:"#3a2e75", p:"#9dbf5e", bar:"#2c2259",
+   url:"https://stream-relay-geo.ntslive.net/stream2", meta:{type:"nts", key:1}},
+  {name:"Mutant Radio", city:"Tbilisi", canvas:"#c2541e", p:"#119181", bar:"#9c4116",
+   url:"https://listen.radioking.com/radio/282820/stream/328621", meta:{type:"radioking", key:"mutant-radio"}},
+  {name:"Worldwide FM", city:"London", canvas:"#b85c66", p:"#2aa3a0", bar:"#94454e",
+   url:"https://worldwide-fm.radiocult.fm/stream", meta:{type:"radiocult", key:"worldwide-fm"}},
+  {name:"Kiosk Radio", city:"Brussels", canvas:"#2e5d34", p:"#8fc8a4", bar:"#224727",
+   url:"https://kioskradiobxl.airtime.pro/kioskradiobxl_b", meta:{type:"airtime", key:"kioskradiobxl"}},
+  {name:"Norrm Radio", city:"Bandung", canvas:"#6b4226", p:"#efa63b", bar:"#54331d",
+   url:"https://listen.norrm.com/default", meta:{type:"icecast", key:"https://listen.norrm.com/status-json.xsl"}}
+];
+/* =================================================================================== */
+
+const DEFAULT_CANVAS = "#dd9530";
+const DEFAULT_BAR = "#33231a";
+const root = document.documentElement;
+const grid = document.getElementById('grid');
+const player = document.getElementById('player');
+const barName = document.getElementById('barName');
+const barSub = document.getElementById('barSub');
+const ppIcon = document.getElementById('ppIcon');
+const PLAY = 'M8 5v14l11-7z';
+const PAUSE = 'M6 5h4v14H6zM14 5h4v14h-4z';
+const ORN = `<svg class="orn" viewBox="0 0 100 100" preserveAspectRatio="none" stroke-width="1">
+  <path d="M8 14 q8 -8 14 0 q-8 6 -14 0 Z M6 26 q6 6 0 12"/>
+  <path d="M92 14 q-8 -8 -14 0 q8 6 14 0 Z M94 26 q-6 6 0 12"/>
+  <path d="M12 88 q10 -6 16 2 M88 88 q-10 -6 -16 2"/>
+  <path d="M20 8 a34 34 0 0 1 60 0" stroke-dasharray="2 4"/>
+  <circle cx="14" cy="50" r="1.2" fill="#f4ecd8" stroke="none"/>
+  <circle cx="86" cy="50" r="1.2" fill="#f4ecd8" stroke="none"/>
+  <circle cx="22" cy="66" r="1.2" fill="#f4ecd8" stroke="none"/>
+  <circle cx="78" cy="66" r="1.2" fill="#f4ecd8" stroke="none"/>
+  <circle cx="30" cy="22" r="1.2" fill="#f4ecd8" stroke="none"/>
+  <circle cx="70" cy="22" r="1.2" fill="#f4ecd8" stroke="none"/>
+</svg>`;
+
+let current = -1;
+let boxes = [];
+const nowText = STATIONS.map(()=>'');
+
+/* ---- build grid ---- */
+STATIONS.forEach((s, i) => {
+  const el = document.createElement('div');
+  el.className = 'unit';
+  el.innerHTML = `
+    <div class="stamp">
+      <div class="panel" style="--p:${s.p}">
+        ${s.img ? `<img class="art" src="${s.img}" alt="">` : ORN}
+        <div class="banner">${s.name}</div>
+        <div class="plate">${s.city}</div>
+        <div class="onair"></div>
+      </div>
+    </div>
+    <div class="below" id="below-${i}"></div>`;
+  el.addEventListener('click', () => strike(i));
+  grid.appendChild(el);
+  boxes.push(el);
+});
+
+/* ---- strike: tap = tune + play · tap lit = pause ---- */
+function strike(i){
+  if (i === current && !player.paused){ pause(); return; }
+  if (i === current && player.paused){ resume(); return; }
+  setUnit(i, 'loading'); setBelow(i, 'Striking…', false);
+  if (current >= 0 && current !== i){ setUnit(current, ''); refreshBelow(current); }
+  current = i;
+  player.src = STATIONS[i].url;
+  player.play().catch(()=> deadAir(i));
+  paintWorld(i);
+  updateBar();
+}
+function pause(){ player.pause(); }
+function resume(){
+  if (current < 0) return;
+  player.play().catch(()=> deadAir(current));
+}
+function deadAir(i){ setUnit(i,''); setBelow(i,'Dead air', true); }
+
+document.getElementById('ppBtn').addEventListener('click', () => {
+  if (current < 0) return;
+  player.paused ? resume() : pause();
+});
+
+/* ---- world colour: page + bar flip to the station's palette ---- */
+function paintWorld(i){
+  if (i < 0){
+    root.style.setProperty('--canvas', DEFAULT_CANVAS);
+    root.style.setProperty('--bar', DEFAULT_BAR);
+    return;
+  }
+  root.style.setProperty('--canvas', STATIONS[i].canvas);
+  root.style.setProperty('--bar', STATIONS[i].bar);
+}
+
+/* ---- audio events drive UI truth ---- */
+player.addEventListener('playing', () => {
+  setUnit(current, 'lit'); refreshBelow(current);
+  ppIcon.innerHTML = `<path d="${PAUSE}"/>`;
+  updateBar(); mediaSession();
+});
+player.addEventListener('pause', () => {
+  if (current >= 0){ setUnit(current, ''); refreshBelow(current); }
+  ppIcon.innerHTML = `<path d="${PLAY}"/>`;
+  if (current >= 0) barSub.textContent = 'Paused';
+});
+player.addEventListener('waiting', () => { if (current>=0){ setUnit(current,'loading'); } });
+player.addEventListener('error', () => { if (current>=0){ deadAir(current); ppIcon.innerHTML=`<path d="${PLAY}"/>`; }});
+
+function setUnit(i, cls){
+  boxes[i].classList.remove('lit','loading');
+  if (cls) boxes[i].classList.add(cls);
+}
+function setBelow(i, text, dim){
+  const el = document.getElementById('below-'+i);
+  el.textContent = text;
+  el.classList.toggle('dead', !!dim);
+}
+function refreshBelow(i){ setBelow(i, nowText[i] || '', false); }
+
+function updateBar(){
+  if (current < 0) return;
+  barName.textContent = STATIONS[current].name;
+  barSub.textContent = nowText[current] ? 'Now playing — ' + nowText[current] : 'Nothing playing';
+}
+
+/* ---- lockscreen controls ---- */
+function mediaSession(){
+  if (!('mediaSession' in navigator) || current < 0) return;
+  const s = STATIONS[current];
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: nowText[current] || s.name,
+    artist: 'Nangu Pangu · ' + s.city
+  });
+  navigator.mediaSession.setActionHandler('play', resume);
+  navigator.mediaSession.setActionHandler('pause', pause);
+}
+
+/* ---- now-playing fetchers (every one fails silently) ---- */
+const j = u => fetch(u).then(r => r.json());
+const FETCHERS = {
+  nts: async (key) => {
+    const d = await j('https://www.nts.live/api/v2/live');
+    return d.results?.[key]?.now?.broadcast_title || '';
+  },
+  radiocult: async (key) => {
+    const d = await j(`https://api.radiocult.fm/api/station/${key}/schedule/live`);
+    const r = d.result || d;
+    return r?.content?.title || r?.metadata?.title || r?.title || '';
+  },
+  radiojar: async (key) => {
+    const d = await j(`https://www.radiojar.com/api/stations/${key}/now_playing/`);
+    return [d.artist, d.title].filter(Boolean).join(' — ') || '';
+  },
+  radioking: async (key) => {
+    const d = await j(`https://api.radioking.io/widget/radio/${key}/track/current`);
+    return [d.artist, d.title].filter(Boolean).join(' — ') || '';
+  },
+  airtime: async (key) => {
+    const d = await j(`https://${key}.airtime.pro/api/live-info`);
+    return d.currentShow?.[0]?.name || d.current?.name || '';
+  },
+  icecast: async (key) => {
+    const d = await j(key);
+    let src = d.icestats?.source;
+    if (Array.isArray(src)) src = src[0];
+    return src?.title || src?.server_name || '';
+  }
+};
+
+async function pollAll(){
+  await Promise.all(STATIONS.map(async (s, i) => {
+    if (!s.meta) return;
+    try{
+      const t = await FETCHERS[s.meta.type](s.meta.key);
+      if (typeof t === 'string'){
+        nowText[i] = t.trim();
+        if (!boxes[i].classList.contains('loading') &&
+            document.getElementById('below-'+i).textContent !== 'Dead air'){
+          refreshBelow(i);
+        }
+        if (i === current && !player.paused) updateBar();
+      }
+    }catch(e){/* silent */}
+  }));
+}
+pollAll();
+setInterval(pollAll, 60000);
+</script>
+</body>
+</html>
