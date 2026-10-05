@@ -2,7 +2,7 @@
 <html lang="en-NZ">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Coffee Log</title>
 <meta name="theme-color" content="#F1F2EF" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#15181A" media="(prefers-color-scheme: dark)">
@@ -197,23 +197,42 @@ body {
 #kind-home:checked + label { background: var(--mug); border-color: var(--mug); color: var(--mug-ink); }
 #kind-out:checked + label { background: var(--cup); border-color: var(--cup); color: var(--cup-ink); }
 .seg input:focus-visible + label { outline: 2px solid var(--ink); outline-offset: 2px; }
-.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fields { display: grid; grid-template-columns: 1.35fr 1fr; gap: 10px; }
 .field { display: grid; gap: 6px; min-width: 0; font-size: 13px; color: var(--muted); }
-.field input {
+.field input, .field select {
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  padding: 11px 12px;
+  height: 50px;
+  padding: 0 12px;
   border: 1.5px solid var(--rule);
   border-radius: 14px;
   background: var(--ground);
   color: var(--ink);
   font-family: var(--font-time);
   font-variation-settings: "MONO" 1, "CASL" 1;
-  font-size: 17px;
+  font-size: 16px;
 }
-.field input:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.field select { font-family: var(--font-ui); font-variation-settings: "CASL" 1, "MONO" 0; }
+.field input:focus-visible, .field select:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
 .field input.bad { border-color: var(--danger); }
+.nudge { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.nudge button {
+  appearance: none;
+  height: 40px;
+  padding: 0;
+  border: 1.5px solid var(--rule);
+  border-radius: 12px;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-time);
+  font-variation-settings: "MONO" 1, "CASL" 1;
+  font-size: 13px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.nudge button:active { transform: scale(.95); background: var(--rule); }
+.nudge button:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
 .actions { display: flex; align-items: center; gap: 6px; }
 .actions .spacer { flex: 1; }
 .text-btn, .solid-btn {
@@ -321,8 +340,16 @@ body {
       <label for="kind-out"><i class="dot out" aria-hidden="true"></i>out</label>
     </div>
     <div class="fields">
-      <label class="field" for="edit-date"><span>Date</span><input type="date" id="edit-date" required></label>
-      <label class="field" for="edit-time"><span>Time</span><input type="time" id="edit-time" required></label>
+      <label class="field" for="edit-day"><span>Day</span><select id="edit-day"></select></label>
+      <label class="field" for="edit-time"><span>Time, 24h</span><input type="text" id="edit-time" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" maxlength="8" placeholder="07:40"></label>
+    </div>
+    <div class="nudge" role="group" aria-label="Shift the time">
+      <button type="button" data-min="-60">−1h</button>
+      <button type="button" data-min="-30">−30m</button>
+      <button type="button" data-min="-15">−15m</button>
+      <button type="button" data-min="15">+15m</button>
+      <button type="button" data-min="30">+30m</button>
+      <button type="button" data-min="60">+1h</button>
     </div>
     <div class="actions">
       <button type="button" class="text-btn danger" id="edit-delete">Delete</button>
@@ -347,7 +374,7 @@ body {
   const $ = id => document.getElementById(id);
   const els = {
     home: $('log-home'), out: $('log-out'), days: $('days'), empty: $('empty'), status: $('status'),
-    sheet: $('sheet'), form: $('edit-form'), date: $('edit-date'), time: $('edit-time'),
+    sheet: $('sheet'), form: $('edit-form'), day: $('edit-day'), time: $('edit-time'),
     del: $('edit-delete'), cancel: $('edit-cancel'),
     toast: $('toast'), toastMsg: $('toast-msg'), undo: $('toast-undo'),
   };
@@ -530,16 +557,74 @@ body {
   els.out.addEventListener('click', () => logCup('out', els.out));
 
   // ---------- editing ----------
+  const MIN = 60000;
+  let needsReload = false;   // a newer version arrived while the edit sheet was open
+
+  // Reads a typed time: 740, 0740, 7:40, 07:40, 7.40, 7, and a trailing am/pm. Gives { h, m } or null.
+  function parseTime(text) {
+    let s = String(text || '').trim().toLowerCase();
+    let ap = '';
+    const suffix = s.match(/\s*([ap])\.?\s*m?\.?$/);
+    if (suffix) { ap = suffix[1]; s = s.slice(0, suffix.index).trim(); }
+    s = s.replace(/\s*:\s*/g, ':').replace(/[.\s]+/g, ':');
+    let h, mi;
+    if (s.includes(':')) {
+      const parts = s.split(':');
+      if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[0]) || !/^\d{1,2}$/.test(parts[1])) return null;
+      h = +parts[0]; mi = +parts[1];
+    } else {
+      if (!/^\d{1,4}$/.test(s)) return null;
+      if (s.length <= 2) { h = +s; mi = 0; } else { h = +s.slice(0, -2); mi = +s.slice(-2); }
+    }
+    if (ap) {
+      if (h < 1 || h > 12) return null;
+      if (ap === 'p' && h < 12) h += 12;
+      if (ap === 'a' && h === 12) h = 0;
+    }
+    if (h > 23 || mi > 59) return null;
+    return { h, m: mi };
+  }
+
+  const keyShift = (k, n) => { const d = fromKey(k); d.setDate(d.getDate() + n); return dayKey(d.getTime()); };
+  function dayName(k) {
+    const today = dayKey(Date.now());
+    if (k === today) return 'Today · ' + dayLabel(k);
+    if (k === keyShift(today, -1)) return 'Yesterday · ' + dayLabel(k);
+    if (k === keyShift(today, 1)) return 'Tomorrow · ' + dayLabel(k);
+    return dayLabel(k);
+  }
+  // The last 30 days, plus tomorrow, plus whichever day this coffee is on.
+  function fillDays(selected) {
+    const today = dayKey(Date.now());
+    const set = new Set([selected]);
+    for (let i = -1; i <= 30; i++) set.add(keyShift(today, -i));
+    els.day.replaceChildren(...[...set].sort().reverse().map(k => {
+      const o = document.createElement('option');
+      o.value = k;
+      o.textContent = dayName(k);
+      return o;
+    }));
+    els.day.value = selected;
+  }
+  function fieldAt() {
+    const t = parseTime(els.time.value);
+    if (!t || !els.day.value) return null;
+    const p = els.day.value.split('-').map(Number);
+    return new Date(p[0], p[1] - 1, p[2], t.h, t.m).getTime();
+  }
+  function setFields(at) {
+    fillDays(dayKey(at));
+    els.time.value = clock(at);
+    els.time.classList.remove('bad');
+  }
+
   let editing = null;
   function openEdit(id) {
     const c = cups.find(x => x.id === id);
     if (!c) return;
     editing = { id: c.id, kind: c.kind, at: c.at };
     document.getElementById('kind-' + c.kind).checked = true;
-    els.date.value = dayKey(c.at);
-    els.time.value = clock(c.at);
-    els.date.classList.remove('bad');
-    els.time.classList.remove('bad');
+    setFields(c.at);
     if (!els.sheet.open) els.sheet.showModal();
   }
   function closeSheet() { if (els.sheet.open) els.sheet.close(); }
@@ -549,25 +634,39 @@ body {
     if (chip) openEdit(chip.dataset.id);
   });
   els.sheet.addEventListener('click', e => { if (e.target === els.sheet) closeSheet(); });
-  els.sheet.addEventListener('close', () => { editing = null; });
+  els.sheet.addEventListener('close', () => { editing = null; if (needsReload) location.reload(); });
   els.cancel.addEventListener('click', closeSheet);
+
+  // Tapping the time selects it all, so typing replaces it. (Phones place the cursor after the tap, so select again on finger-up.)
+  let timeTyped = false;
+  const selectTime = () => { if (!timeTyped) { try { els.time.select(); } catch (_) {} } };
+  els.time.addEventListener('focus', () => { timeTyped = false; setTimeout(selectTime, 0); });
+  els.time.addEventListener('pointerup', () => setTimeout(selectTime, 0));
+  els.time.addEventListener('input', () => { timeTyped = true; els.time.classList.remove('bad'); });
+  els.time.addEventListener('blur', () => {
+    const t = parseTime(els.time.value);
+    if (t) els.time.value = pad(t.h) + ':' + pad(t.m);
+  });
+  for (const b of document.querySelectorAll('.nudge button')) {
+    b.addEventListener('click', () => {
+      const base = fieldAt() ?? (editing && editing.at);
+      if (base == null) return;
+      setFields(base + Number(b.dataset.min) * MIN);
+    });
+  }
 
   els.form.addEventListener('submit', e => {
     e.preventDefault();
     const prev = editing;
     if (!prev) { closeSheet(); return; }
-    const dv = els.date.value;
-    const tv = (els.time.value || '').slice(0, 5);
-    const okDate = /^\d{4}-\d{2}-\d{2}$/.test(dv);
-    const okTime = /^\d{2}:\d{2}$/.test(tv);
-    els.date.classList.toggle('bad', !okDate);
-    els.time.classList.toggle('bad', !okTime);
-    if (!okDate || !okTime) return;
+    const t = parseTime(els.time.value);
+    const dk = els.day.value;
+    els.time.classList.toggle('bad', !t);
+    if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(dk)) return;
     const kind = els.form.elements.kind.value || prev.kind;
-    const p = dv.split('-').map(Number);
-    const q = tv.split(':').map(Number);
-    const unchangedTime = dv === dayKey(prev.at) && tv === clock(prev.at);
-    const at = unchangedTime ? prev.at : new Date(p[0], p[1] - 1, p[2], q[0], q[1]).getTime();
+    const p = dk.split('-').map(Number);
+    const unchanged = dk === dayKey(prev.at) && pad(t.h) + ':' + pad(t.m) === clock(prev.at);
+    const at = unchanged ? prev.at : new Date(p[0], p[1] - 1, p[2], t.h, t.m).getTime();
     closeSheet();
     if (kind === prev.kind && at === prev.at) return;
     put({ id: prev.id, kind, at });
@@ -589,6 +688,12 @@ body {
   render();
 
   if ('serviceWorker' in navigator) {
+    // When a newer version of the page takes over, reload once so it shows up without any effort.
+    const hadWorker = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadWorker) return;
+      if (els.sheet.open) needsReload = true; else location.reload();
+    });
     window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
   }
 })();
