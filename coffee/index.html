@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Coffee Log</title>
+<meta name="theme-color" content="#F1F2EF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#15181A" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Recursive:wght,CASL,MONO@400..700,0..1,0..1&display=swap">
+<style>
+/* Layout: two big tiles (home mug, takeaway cup) on top; a day-by-day docket of tappable times underneath. */
+:root {
+  color-scheme: light dark;
+  --ground: #F1F2EF;   /* unglazed porcelain */
+  --ink: #2E3336;
+  --muted: #646C70;
+  --rule: #DEE1DD;
+  --mug: #D5E2EA;      /* home: glazed mug blue */
+  --mug-ink: #3B596D;
+  --cup: #ECDDC7;      /* out: kraft takeaway cup */
+  --cup-ink: #7E5430;
+  --sheet: #FAFAF8;
+  --scrim: rgba(28, 34, 38, .34);
+  --danger: #A0443A;
+  --font-ui: "Recursive", ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-time: "Recursive", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #15181A; --ink: #E3E6E5; --muted: #8C959A; --rule: #262B2E;
+    --mug: #233340; --mug-ink: #A9C8DC; --cup: #382D22; --cup-ink: #E2BE94;
+    --sheet: #1E2225; --scrim: rgba(0, 0, 0, .55); --danger: #E68B7F;
+  }
+}
+
+html { background: var(--ground); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-variation-settings: "CASL" 1, "MONO" 0;
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap {
+  max-width: 520px;
+  margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(120px + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  gap: 24px;
+}
+
+/* the two buttons */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tile {
+  appearance: none;
+  border: 0;
+  border-radius: 26px;
+  height: clamp(168px, 33vh, 260px);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 620;
+  letter-spacing: .01em;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform .12s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tile svg {
+  width: 58px; height: 58px;
+  fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.tile.home { background: var(--mug); color: var(--mug-ink); }
+.tile.out { background: var(--cup); color: var(--cup-ink); }
+.tile:active { transform: scale(.97); }
+.tile:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+.tile.flash { animation: flash .6s ease-out; }
+@keyframes flash { from { filter: brightness(1.1) saturate(1.2); } to { filter: none; } }
+
+/* the log */
+.log-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+  color: var(--muted);
+}
+.log-head .name { color: var(--ink); font-weight: 650; letter-spacing: .02em; }
+.status { color: var(--muted); font-weight: 450; }
+.status::before { content: "· "; }
+.legend { display: flex; gap: 14px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; box-sizing: border-box; flex: none; }
+.dot.home { border: 2px solid var(--mug-ink); }
+.dot.out { background: var(--cup-ink); }
+
+.days { list-style: none; margin: 0; padding: 0; }
+.month {
+  padding-block: 18px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.month:first-child { padding-top: 8px; }
+.day {
+  display: grid;
+  grid-template-columns: 5.7em 1fr;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding-block: 6px;
+  border-bottom: 1px solid var(--rule);
+}
+.date { font-size: 14px; color: var(--muted); white-space: nowrap; }
+.day.today .date { color: var(--ink); font-weight: 650; }
+.cups { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.none { color: var(--muted); padding-left: 4px; }
+.chip {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 9px 6px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-time);
+  font-variation-settings: "MONO" 1, "CASL" 1;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  color: var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.chip.home { background: var(--mug); }
+.chip.out { background: var(--cup); }
+.chip:active { transform: scale(.95); }
+.chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.chip.new { animation: pop .38s cubic-bezier(.3, 1.4, .5, 1); }
+@keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.empty { margin: 0; padding-top: 14px; max-width: 34ch; font-size: 14px; color: var(--muted); }
+
+/* edit sheet */
+.sheet {
+  border: 0;
+  padding: 0;
+  margin: auto auto 0;
+  width: 100%;
+  max-width: 520px;
+  max-height: 100%;
+  box-sizing: border-box;
+  border-radius: 26px 26px 0 0;
+  background: var(--sheet);
+  color: var(--ink);
+}
+.sheet::backdrop { background: var(--scrim); }
+.sheet[open] { animation: slide .22s ease-out; }
+@keyframes slide { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.edit {
+  display: grid;
+  gap: 18px;
+  padding: 22px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+}
+.edit h2 { margin: 0; font-size: 18px; font-weight: 650; outline: none; }
+.seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.seg label {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  height: 50px;
+  border-radius: 16px;
+  border: 1.5px solid var(--rule);
+  font-weight: 600;
+  cursor: pointer;
+}
+#kind-home:checked + label { background: var(--mug); border-color: var(--mug); color: var(--mug-ink); }
+#kind-out:checked + label { background: var(--cup); border-color: var(--cup); color: var(--cup-ink); }
+.seg input:focus-visible + label { outline: 2px solid var(--ink); outline-offset: 2px; }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field { display: grid; gap: 6px; min-width: 0; font-size: 13px; color: var(--muted); }
+.field input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1.5px solid var(--rule);
+  border-radius: 14px;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-time);
+  font-variation-settings: "MONO" 1, "CASL" 1;
+  font-size: 17px;
+}
+.field input:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.field input.bad { border-color: var(--danger); }
+.actions { display: flex; align-items: center; gap: 6px; }
+.actions .spacer { flex: 1; }
+.text-btn, .solid-btn {
+  appearance: none;
+  border: 0;
+  font: inherit;
+  font-weight: 620;
+  border-radius: 14px;
+  cursor: pointer;
+}
+.text-btn { background: none; color: var(--muted); padding: 12px 12px; }
+.text-btn.danger { color: var(--danger); padding-left: 4px; }
+.solid-btn { background: var(--ink); color: var(--ground); padding: 12px 24px; }
+.text-btn:focus-visible, .solid-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* toast */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: calc(100% - 32px);
+  max-width: 488px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 10px 16px;
+  min-height: 48px;
+  border-radius: 16px;
+  background: var(--ink);
+  color: var(--ground);
+  font-size: 15px;
+  z-index: 5;
+}
+.toast[hidden] { display: none; }
+.toast.rise { animation: rise .2s ease-out; }
+@keyframes rise { from { transform: translate(-50%, 10px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+.toast .msg { min-width: 0; }
+.toast button {
+  margin-left: auto;
+  appearance: none;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 10px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.toast button:focus-visible { outline: 2px solid var(--ground); outline-offset: 1px; }
+[hidden] { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="tiles" aria-label="Log a coffee">
+    <button type="button" class="tile home" id="log-home" aria-label="Log a home coffee now">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7.6 4.5h8.8L20 10H4z"/>
+        <path d="M6 10v9.5h12V10"/>
+        <path d="M10.3 19.5V15h3.4v4.5"/>
+      </svg>
+      <span>home</span>
+    </button>
+    <button type="button" class="tile out" id="log-out" aria-label="Log an out coffee now">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5.4 7h13.2"/>
+        <path d="M7.2 7l.5-2a1 1 0 0 1 1-.8h6.6a1 1 0 0 1 1 .8l.5 2"/>
+        <path d="M6.3 7l1.5 12.6a1 1 0 0 0 1 .9h6.4a1 1 0 0 0 1-.9L17.7 7"/>
+        <path d="M6.8 11.5h10.4"/>
+        <path d="M7.3 16h9.4"/>
+      </svg>
+      <span>out</span>
+    </button>
+  </section>
+
+  <section class="log" aria-label="Coffee log">
+    <div class="log-head">
+      <div><span class="name">coffee log</span> <span class="status" id="status" hidden></span></div>
+      <div class="legend" aria-label="Key">
+        <span><i class="dot home" aria-hidden="true"></i>home</span>
+        <span><i class="dot out" aria-hidden="true"></i>out</span>
+      </div>
+    </div>
+    <ul class="days" id="days"></ul>
+    <p class="empty" id="empty">Tap a tile each time you have a coffee. Forgot one? Tap the tile anyway, then tap its time to change it.</p>
+  </section>
+</main>
+
+<dialog class="sheet" id="sheet" aria-labelledby="sheet-title">
+  <form class="edit" id="edit-form" novalidate>
+    <h2 id="sheet-title" tabindex="-1" autofocus>Edit coffee</h2>
+    <div class="seg" role="radiogroup" aria-label="Where it was">
+      <input type="radio" name="kind" id="kind-home" value="home">
+      <label for="kind-home"><i class="dot home" aria-hidden="true"></i>home</label>
+      <input type="radio" name="kind" id="kind-out" value="out">
+      <label for="kind-out"><i class="dot out" aria-hidden="true"></i>out</label>
+    </div>
+    <div class="fields">
+      <label class="field" for="edit-date"><span>Date</span><input type="date" id="edit-date" required></label>
+      <label class="field" for="edit-time"><span>Time</span><input type="time" id="edit-time" required></label>
+    </div>
+    <div class="actions">
+      <button type="button" class="text-btn danger" id="edit-delete">Delete</button>
+      <span class="spacer"></span>
+      <button type="button" class="text-btn" id="edit-cancel">Cancel</button>
+      <button type="submit" class="solid-btn" id="edit-save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden>
+  <span class="msg" id="toast-msg"></span>
+  <button type="button" id="toast-undo">Undo</button>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const KEY = 'coffee-log.v1';
+
+  const $ = id => document.getElementById(id);
+  const els = {
+    home: $('log-home'), out: $('log-out'), days: $('days'), empty: $('empty'), status: $('status'),
+    sheet: $('sheet'), form: $('edit-form'), date: $('edit-date'), time: $('edit-time'),
+    del: $('edit-delete'), cancel: $('edit-cancel'),
+    toast: $('toast'), toastMsg: $('toast-msg'), undo: $('toast-undo'),
+  };
+
+  const pad = n => String(n).padStart(2, '0');
+  const dayKey = t => { const d = new Date(t); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+  const clock = t => { const d = new Date(t); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+  const fromKey = k => { const p = k.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); };
+  const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dayLabel = k => { const d = fromKey(k); return WD[d.getDay()] + ' ' + d.getDate() + ' ' + MO[d.getMonth()]; };
+  const monthLabel = k => { const d = fromKey(k); return MO[d.getMonth()] + ' ' + d.getFullYear(); };
+  const kindName = k => (k === 'home' ? 'Home' : 'Out');
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  const isCup = c => !!c && typeof c.id === 'string' && c.id.length > 0 &&
+    (c.kind === 'home' || c.kind === 'out') && Number.isFinite(c.at);
+
+  // ---------- saving: the log lives in this browser's storage on this phone ----------
+  let canSave = true;
+
+  function read() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); } catch (_) { canSave = false; return []; }
+    if (!raw) return [];
+    try {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        return list.filter(isCup).map(c => ({ id: c.id, kind: c.kind, at: c.at })).sort((a, b) => a.at - b.at);
+      }
+    } catch (_) {}
+    // Unreadable: keep the raw text aside instead of letting the next save overwrite it.
+    try { localStorage.setItem(KEY + '.unreadable', raw); } catch (_) {}
+    return [];
+  }
+
+  let cups = read();
+
+  function write() {
+    try { localStorage.setItem(KEY, JSON.stringify(cups)); canSave = true; }
+    catch (_) { canSave = false; }
+    renderStatus();
+  }
+
+  // Pick up changes made in another tab, without dropping anything that failed to save here.
+  function sync() {
+    const fresh = read();
+    if (canSave) cups = fresh;
+  }
+
+  // Ask the browser not to clear this data when the phone is short on space.
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (_) {}
+
+  function put(e) {
+    cups = cups.filter(c => c.id !== e.id);
+    cups.push({ id: e.id, kind: e.kind, at: e.at });
+    cups.sort((a, b) => a.at - b.at);
+    write();
+    render();
+  }
+  function del(id) {
+    cups = cups.filter(c => c.id !== id);
+    write();
+    render();
+  }
+
+  // ---------- drawing the log ----------
+  let freshId = null, lastSig = '';
+
+  function monthRow(k) {
+    const li = document.createElement('li');
+    li.className = 'month';
+    li.textContent = monthLabel(k);
+    return li;
+  }
+  function dayRow(k, list, isToday) {
+    const li = document.createElement('li');
+    li.className = isToday ? 'day today' : 'day';
+    const date = document.createElement('span');
+    date.className = 'date';
+    date.textContent = dayLabel(k);
+    const box = document.createElement('span');
+    box.className = 'cups';
+    if (list.length) {
+      for (const c of list) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip ' + c.kind + (c.id === freshId ? ' new' : '');
+        b.dataset.id = c.id;
+        b.setAttribute('aria-label', kindName(c.kind) + ' coffee at ' + clock(c.at) + ', ' + dayLabel(k) + '. Edit');
+        const dot = document.createElement('i');
+        dot.className = 'dot ' + c.kind;
+        dot.setAttribute('aria-hidden', 'true');
+        b.append(dot, clock(c.at));
+        box.append(b);
+      }
+    } else {
+      const none = document.createElement('span');
+      none.className = 'none';
+      none.textContent = '—';
+      box.append(none);
+    }
+    li.append(date, box);
+    return li;
+  }
+
+  function renderStatus() {
+    els.status.textContent = canSave ? '' : 'can’t save in this browser';
+    els.status.hidden = canSave;
+  }
+
+  function render() {
+    const byDay = new Map();
+    for (const c of cups) {
+      const k = dayKey(c.at);
+      if (!byDay.has(k)) byDay.set(k, []);
+      byDay.get(k).push(c);
+    }
+    const today = dayKey(Date.now());
+    const signature = today + '|' + cups.map(c => c.id + c.kind + c.at).join(',');
+    if (signature !== lastSig) {
+      lastSig = signature;
+      const keys = [...byDay.keys()].sort();
+      const top = keys.length && keys[keys.length - 1] > today ? keys[keys.length - 1] : today;
+      const bottom = keys.length && keys[0] < today ? keys[0] : today;
+      const frag = document.createDocumentFragment();
+      const d = fromKey(top);
+      let lastMonth = '';
+      for (let i = 0; i < 5000; i++) {
+        const k = dayKey(d.getTime());
+        if (k.slice(0, 7) !== lastMonth) { lastMonth = k.slice(0, 7); frag.append(monthRow(k)); }
+        frag.append(dayRow(k, byDay.get(k) || [], k === today));
+        if (k <= bottom) break;
+        d.setDate(d.getDate() - 1);
+      }
+      els.days.replaceChildren(frag);
+      els.empty.hidden = byDay.size > 0;
+      freshId = null;
+    }
+    renderStatus();
+  }
+
+  // ---------- toast ----------
+  let toastTimer = 0;
+  let undoFn = null;
+  function toast(msg, undo, ms) {
+    els.toastMsg.textContent = msg;
+    undoFn = undo || null;
+    els.undo.hidden = !undoFn;
+    els.toast.hidden = false;
+    els.toast.classList.remove('rise');
+    void els.toast.offsetWidth;
+    els.toast.classList.add('rise');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, ms || (undoFn ? 5000 : 2600));
+  }
+  function hideToast() {
+    clearTimeout(toastTimer);
+    els.toast.hidden = true;
+    undoFn = null;
+  }
+  els.undo.addEventListener('click', () => {
+    const f = undoFn;
+    hideToast();
+    if (f) { f(); toast('Undone', null, 1600); }
+  });
+
+  // ---------- logging ----------
+  function logCup(kind, btn) {
+    const e = { id: newId(), kind, at: Date.now() };
+    freshId = e.id;
+    put(e);
+    btn.classList.remove('flash');
+    void btn.offsetWidth;
+    btn.classList.add('flash');
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) {}
+    toast(kindName(kind) + ' coffee logged at ' + clock(e.at), () => del(e.id));
+  }
+  els.home.addEventListener('click', () => logCup('home', els.home));
+  els.out.addEventListener('click', () => logCup('out', els.out));
+
+  // ---------- editing ----------
+  let editing = null;
+  function openEdit(id) {
+    const c = cups.find(x => x.id === id);
+    if (!c) return;
+    editing = { id: c.id, kind: c.kind, at: c.at };
+    document.getElementById('kind-' + c.kind).checked = true;
+    els.date.value = dayKey(c.at);
+    els.time.value = clock(c.at);
+    els.date.classList.remove('bad');
+    els.time.classList.remove('bad');
+    if (!els.sheet.open) els.sheet.showModal();
+  }
+  function closeSheet() { if (els.sheet.open) els.sheet.close(); }
+
+  els.days.addEventListener('click', e => {
+    const chip = e.target.closest('.chip');
+    if (chip) openEdit(chip.dataset.id);
+  });
+  els.sheet.addEventListener('click', e => { if (e.target === els.sheet) closeSheet(); });
+  els.sheet.addEventListener('close', () => { editing = null; });
+  els.cancel.addEventListener('click', closeSheet);
+
+  els.form.addEventListener('submit', e => {
+    e.preventDefault();
+    const prev = editing;
+    if (!prev) { closeSheet(); return; }
+    const dv = els.date.value;
+    const tv = (els.time.value || '').slice(0, 5);
+    const okDate = /^\d{4}-\d{2}-\d{2}$/.test(dv);
+    const okTime = /^\d{2}:\d{2}$/.test(tv);
+    els.date.classList.toggle('bad', !okDate);
+    els.time.classList.toggle('bad', !okTime);
+    if (!okDate || !okTime) return;
+    const kind = els.form.elements.kind.value || prev.kind;
+    const p = dv.split('-').map(Number);
+    const q = tv.split(':').map(Number);
+    const unchangedTime = dv === dayKey(prev.at) && tv === clock(prev.at);
+    const at = unchangedTime ? prev.at : new Date(p[0], p[1] - 1, p[2], q[0], q[1]).getTime();
+    closeSheet();
+    if (kind === prev.kind && at === prev.at) return;
+    put({ id: prev.id, kind, at });
+    toast('Coffee updated', () => put(prev));
+  });
+
+  els.del.addEventListener('click', () => {
+    const prev = editing;
+    if (!prev) return;
+    closeSheet();
+    del(prev.id);
+    toast('Coffee deleted', () => put(prev));
+  });
+
+  // ---------- start ----------
+  window.addEventListener('storage', e => { if (e.key === KEY || e.key === null) { sync(); render(); } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { sync(); render(); } });
+  setInterval(render, 60000);
+  render();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+  }
+})();
+</script>
+</body>
+</html>
