@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Meds Log</title>
+<meta name="theme-color" content="#16181B" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F1F2EF" media="(prefers-color-scheme: light)">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Lexend:wght@400;500;600&display=swap">
+<style>
+/* Layout: two tap tiles (morning sun, evening moon) that show today's time once logged; a day-by-day list of times below. */
+:root {
+  color-scheme: dark;
+  --bg: #16181b;
+  --line: #2a2e33;
+  --fg: #e9ebee;
+  --muted: #868c95;
+  --am-tile: #362c1b;
+  --am-ink: #e6c27a;
+  --pm-tile: #262a40;
+  --pm-ink: #b4b9e6;
+  --toast-bg: #2a2e34;
+  --toast-fg: #e9ebee;
+  --toast-accent: #e6c27a;
+  --font-ui: "Lexend", ui-rounded, "Segoe UI", system-ui, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f1f2ef;
+    --line: #dee1dd;
+    --fg: #2e3336;
+    --muted: #646c70;
+    --am-tile: #f1e3c3;
+    --am-ink: #7a5a1e;
+    --pm-tile: #dfe1f1;
+    --pm-ink: #424a7d;
+    --toast-bg: #2e3336;
+    --toast-fg: #f1f2ef;
+    --toast-accent: #e6c27a;
+  }
+}
+
+* { box-sizing: border-box; }
+html { background: var(--bg); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-tap-highlight-color: transparent;
+}
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+
+.app {
+  max-width: 520px;
+  margin-inline: auto;
+  padding-inline: 16px;
+  padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(120px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.tile {
+  aspect-ratio: 5 / 6;
+  max-width: 100%;
+  border: 0;
+  border-radius: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.12s ease;
+}
+.tile.morning { background: var(--am-tile); color: var(--am-ink); }
+.tile.evening { background: var(--pm-tile); color: var(--pm-ink); }
+.tile svg { width: 56px; height: 56px; margin-bottom: 4px; }
+.tile .label { font-family: var(--font-data); font-size: 26px; font-weight: 500; }
+.tile .state { font-family: var(--font-data); font-size: 13px; opacity: 0.8; font-variant-numeric: tabular-nums; }
+.tile.done { box-shadow: inset 0 0 0 2px currentColor; }
+.tile.done .state { opacity: 1; font-weight: 600; }
+.tile:active { transform: scale(0.97); }
+.tile.flash { animation: flash 0.6s ease-out; }
+@keyframes flash { from { filter: brightness(1.25); } to { filter: none; } }
+
+.loghead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.loghead h2 { margin: 0; font-size: 22px; font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--font-data); font-size: 15px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+
+.dot { display: inline-block; flex: none; width: 11px; height: 11px; border-radius: 50%; }
+.dot.morning { border: 2.5px solid var(--am-ink); }
+.dot.evening { background: var(--pm-ink); }
+
+.status { margin: 18px 0 0; max-width: 44ch; color: var(--muted); font-size: 15px; line-height: 1.55; }
+
+.days { list-style: none; margin: 0; padding: 0; }
+.month {
+  padding-block: 20px 4px;
+  font-family: var(--font-data);
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.day {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding-block: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.day .d { font-size: 17px; font-weight: 600; color: var(--muted); }
+.day.today .d { color: var(--fg); }
+.times { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.none { color: var(--muted); }
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 13px 6px 11px;
+  border-radius: 999px;
+  font-family: var(--font-data);
+  font-size: 15px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.pill.morning { background: var(--am-tile); color: var(--am-ink); }
+.pill.evening { background: var(--pm-tile); color: var(--pm-ink); }
+.pill .dot.morning { border-color: currentColor; }
+.pill .dot.evening { background: currentColor; }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 12px 12px 12px 18px;
+  border-radius: 16px;
+  background: var(--toast-bg);
+  color: var(--toast-fg);
+  font-size: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 140%);
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+.toast.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+.toast button {
+  padding: 6px 8px;
+  border: 0;
+  background: none;
+  color: var(--toast-accent);
+  font: 600 15px var(--font-ui);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="tiles" role="group" aria-label="Log meds">
+    <button type="button" class="tile morning" data-kind="morning">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4"/>
+        <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>
+      </svg>
+      <span class="label">morning</span>
+      <span class="state">not yet today</span>
+    </button>
+    <button type="button" class="tile evening" data-kind="evening">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+      </svg>
+      <span class="label">evening</span>
+      <span class="state">not yet today</span>
+    </button>
+  </div>
+
+  <section aria-labelledby="logTitle">
+    <div class="loghead">
+      <h2 id="logTitle">meds log</h2>
+      <div class="legend" aria-hidden="true">
+        <span><i class="dot morning"></i>morning</span>
+        <span><i class="dot evening"></i>evening</span>
+      </div>
+    </div>
+    <p class="status" id="status" hidden></p>
+    <ul class="days" id="days"></ul>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <span id="toastMsg"></span>
+  <button type="button" id="toastUndo" hidden>Undo</button>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const KEY = 'meds-log.v1';
+  const KINDS = ['morning', 'evening'];
+  const NAME = { morning: 'Morning meds', evening: 'Evening meds' };
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const $ = id => document.getElementById(id);
+  const tiles = Array.from(document.querySelectorAll('.tile'));
+  const daysEl = $('days');
+  const statusEl = $('status');
+  const toastEl = $('toast');
+  const toastMsg = $('toastMsg');
+  const toastUndo = $('toastUndo');
+
+  const pad = n => String(n).padStart(2, '0');
+  const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+  const clock = t => { const d = new Date(t); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  const fromKey = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+  const dayLabel = k => { const d = fromKey(k); return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`; };
+  const monthLabel = k => { const d = fromKey(k); return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`; };
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const isEntry = e => !!e && typeof e.id === 'string' && KINDS.includes(e.kind) && Number.isFinite(e.at);
+
+  /* saving: the log lives in this browser's storage on this phone */
+  let canSave = true;
+
+  function read() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); } catch (_) { canSave = false; return []; }
+    if (!raw) return [];
+    try {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) return list.filter(isEntry).map(e => ({ id: e.id, kind: e.kind, at: e.at })).sort((a, b) => a.at - b.at);
+    } catch (_) {}
+    // Unreadable: keep the raw text aside instead of letting the next save overwrite it.
+    try { localStorage.setItem(KEY + '.unreadable', raw); } catch (_) {}
+    return [];
+  }
+
+  let log = read();
+
+  function write() {
+    try { localStorage.setItem(KEY, JSON.stringify(log)); canSave = true; }
+    catch (_) { canSave = false; }
+  }
+
+  // Ask the browser not to clear this data when the phone is short on space.
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (_) {}
+
+  /* drawing */
+  let lastSig = '';
+
+  function render() {
+    const today = dayKey(Date.now());
+    for (const t of tiles) {
+      const kind = t.dataset.kind;
+      const todays = log.filter(e => e.kind === kind && dayKey(e.at) === today);
+      const last = todays[todays.length - 1];
+      t.classList.toggle('done', !!last);
+      t.querySelector('.state').textContent = last ? `taken ${clock(last.at)}` : 'not yet today';
+      t.setAttribute('aria-label', `Log ${NAME[kind].toLowerCase()} now` + (last ? `. Logged today at ${clock(last.at)}` : ''));
+    }
+
+    let message = '';
+    if (!canSave) message = "This browser won't save entries, so they'll be lost when the page closes.";
+    else if (!log.length) message = 'Nothing logged yet. Tap morning or evening when you take your meds.';
+    statusEl.textContent = message;
+    statusEl.hidden = !message;
+
+    const sig = today + '|' + log.map(e => e.id + e.kind + e.at).join(',');
+    if (sig === lastSig) return;
+    lastSig = sig;
+
+    const byDay = new Map();
+    for (const e of log) {
+      const k = dayKey(e.at);
+      if (!byDay.has(k)) byDay.set(k, []);
+      byDay.get(k).push(e);
+    }
+    const frag = document.createDocumentFragment();
+    if (log.length) {
+      // Every day from the first entry to today, so a missed day shows as a gap.
+      const first = dayKey(log[0].at);
+      const d = fromKey(today > first ? today : first);
+      let month = '';
+      for (let i = 0; i < 1000; i++) {
+        const k = dayKey(d.getTime());
+        if (k.slice(0, 7) !== month) {
+          month = k.slice(0, 7);
+          const m = document.createElement('li');
+          m.className = 'month';
+          m.textContent = monthLabel(k);
+          frag.append(m);
+        }
+        const li = document.createElement('li');
+        li.className = 'day' + (k === today ? ' today' : '');
+        const date = document.createElement('span');
+        date.className = 'd';
+        date.textContent = dayLabel(k);
+        const times = document.createElement('span');
+        times.className = 'times';
+        const list = byDay.get(k) || [];
+        if (list.length) {
+          for (const e of list) {
+            const pill = document.createElement('span');
+            pill.className = 'pill ' + e.kind;
+            pill.setAttribute('aria-label', `${NAME[e.kind]} at ${clock(e.at)}`);
+            const dot = document.createElement('i');
+            dot.className = 'dot ' + e.kind;
+            pill.append(dot, clock(e.at));
+            times.append(pill);
+          }
+        } else {
+          const none = document.createElement('span');
+          none.className = 'none';
+          none.textContent = '—';
+          times.append(none);
+        }
+        li.append(date, times);
+        frag.append(li);
+        if (k <= first) break;
+        d.setDate(d.getDate() - 1);
+      }
+    }
+    daysEl.replaceChildren(frag);
+  }
+
+  /* toast */
+  let toastTimer = 0;
+  function toast(message, undo) {
+    toastMsg.textContent = message;
+    toastUndo.hidden = !undo;
+    toastUndo.onclick = undo ? () => { hideToast(); undo(); toast('Undone'); } : null;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, undo ? 6000 : 2400);
+  }
+  function hideToast() {
+    clearTimeout(toastTimer);
+    toastEl.classList.remove('show');
+  }
+
+  /* logging */
+  function logMeds(kind, tile) {
+    const now = Date.now();
+    const again = log.some(e => e.kind === kind && dayKey(e.at) === dayKey(now));
+    const entry = { id: newId(), kind, at: now };
+    log.push(entry);
+    write();
+    render();
+    tile.classList.remove('flash');
+    void tile.offsetWidth;
+    tile.classList.add('flash');
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) {}
+    if (!canSave) { toast("Couldn't save on this phone."); return; }
+    toast(`${NAME[kind]} logged ${again ? 'again ' : ''}at ${clock(now)}`, () => {
+      log = log.filter(e => e.id !== entry.id);
+      write();
+      render();
+    });
+  }
+
+  tiles.forEach(t => t.addEventListener('click', () => logMeds(t.dataset.kind, t)));
+  tiles.forEach(t => t.addEventListener('animationend', () => t.classList.remove('flash')));
+
+  window.addEventListener('storage', e => { if (e.key === KEY || e.key === null) { log = read(); render(); } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (canSave) log = read(); render(); } });
+  setInterval(render, 60000);
+  render();
+
+  if ('serviceWorker' in navigator) {
+    // When a newer version of the page takes over, reload once so it shows up without any effort.
+    const hadWorker = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadWorker) location.reload(); });
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+  }
+})();
+</script>
+</body>
+</html>
