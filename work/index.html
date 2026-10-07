@@ -1,0 +1,920 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Work Log</title>
+<meta name="theme-color" content="#16181B" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F1F2EF" media="(prefers-color-scheme: light)">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Lexend:wght@400;500;600&display=swap">
+<style>
+/* Layout: the coffee-log pattern. Two big tap tiles with a full-width "didn't work" bar under them, a month-grouped day log below, bottom sheets for edits and export. */
+:root {
+  color-scheme: dark;
+  --bg: #16181b;
+  --surface: #1f2226;
+  --line: #2a2e33;
+  --fg: #e9ebee;
+  --muted: #868c95;
+  --wfh-tile: #243140;
+  --wfh-ink: #a9c4dd;
+  --office-tile: #372d22;
+  --office-ink: #ddbd95;
+  --off-tile: #263029;
+  --off-ink: #b0d0b3;
+  --danger: #e8968a;
+  --scrim: rgba(5, 6, 8, 0.62);
+  --toast-bg: #2a2e34;
+  --toast-fg: #e9ebee;
+  --toast-accent: #a9c4dd;
+  --font-ui: "Lexend", ui-rounded, "Segoe UI", system-ui, sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #f1f2ef;
+    --surface: #fafaf8;
+    --line: #dee1dd;
+    --fg: #2e3336;
+    --muted: #646c70;
+    --wfh-tile: #d5e2ea;
+    --wfh-ink: #3b596d;
+    --office-tile: #ecddc7;
+    --office-ink: #7e5430;
+    --off-tile: #dbe6d8;
+    --off-ink: #456a4b;
+    --danger: #a0443a;
+    --scrim: rgba(28, 34, 38, 0.34);
+    --toast-bg: #2e3336;
+    --toast-fg: #f1f2ef;
+    --toast-accent: #a9c8dc;
+  }
+}
+
+* { box-sizing: border-box; }
+html { background: var(--bg); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-tap-highlight-color: transparent;
+}
+[hidden] { display: none !important; }
+
+.app {
+  max-width: 520px;
+  margin-inline: auto;
+  padding-inline: 16px;
+  padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(120px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+
+/* Tiles */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.tile {
+  position: relative;
+  aspect-ratio: 5 / 6;
+  max-width: 100%;
+  border: 0;
+  border-radius: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 0.12s ease;
+}
+.tile.wfh { background: var(--wfh-tile); color: var(--wfh-ink); }
+.tile.office { background: var(--office-tile); color: var(--office-ink); }
+.tile svg { width: 56px; height: 56px; }
+.tile-label { font-family: var(--font-data); font-size: 26px; font-weight: 500; }
+.tile.off {
+  grid-column: 1 / -1;
+  aspect-ratio: auto;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 14px;
+  padding-block: 20px;
+  padding-inline: 24px 18px;
+  background: var(--off-tile);
+  color: var(--off-ink);
+}
+.tile.off svg { width: 30px; height: 30px; }
+.tile.off .tile-label { font-size: 22px; }
+.tile:active { transform: scale(0.97); }
+.tile .mark {
+  position: absolute;
+  top: 14px;
+  inset-inline: 0;
+  margin-inline: auto;
+  width: max-content;
+  padding: 3px 10px;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  font-family: var(--font-data);
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.tile.is-today { box-shadow: inset 0 0 0 2px currentColor; }
+.tile.is-today .mark { opacity: 1; }
+.tile.off .mark { position: static; margin-inline: auto 0; }
+.tile.flash { animation: flash 0.6s ease-out; }
+@keyframes flash {
+  from { box-shadow: inset 0 0 0 2px currentColor, 0 0 0 0 currentColor; }
+  to { box-shadow: inset 0 0 0 2px currentColor, 0 0 0 14px transparent; }
+}
+
+/* Log */
+.loghead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.loghead h2 { margin: 0; font-size: 22px; font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: var(--font-data); font-size: 15px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+
+.dot { display: inline-block; flex: none; width: 11px; height: 11px; border-radius: 50%; }
+.dot.ring { border: 2.5px solid var(--wfh-ink); }
+.dot.fill { background: var(--office-ink); }
+.dot.dash { width: 13px; height: 3px; border-radius: 2px; background: var(--off-ink); }
+.wfh .dot { border: 2.5px solid currentColor; }
+.office .dot { background: currentColor; }
+.off .dot { width: 13px; height: 3px; border-radius: 2px; background: currentColor; }
+
+.status { margin: 18px 0 0; max-width: 44ch; color: var(--muted); font-size: 15px; line-height: 1.55; }
+
+.month {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding-block: 20px 4px;
+  font-family: var(--font-data);
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.month .counts { font-size: 12.5px; letter-spacing: 0.04em; text-transform: none; }
+
+.row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 12px;
+  padding-block: 14px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.row:focus-visible { outline-offset: -2px; border-radius: 10px; }
+.row .d { font-size: 17px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.row.today .d { color: var(--fg); }
+.row .chev { width: 18px; height: 18px; color: var(--muted); opacity: 0.55; }
+.row:hover .chev, .row:focus-visible .chev { opacity: 1; }
+
+.pill {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 15px 7px 12px;
+  border-radius: 999px;
+  font-family: var(--font-data);
+  font-size: 15px;
+  font-weight: 500;
+}
+.pill.wfh { background: var(--wfh-tile); color: var(--wfh-ink); }
+.pill.office { background: var(--office-tile); color: var(--office-ink); }
+.pill.off { background: var(--off-tile); color: var(--off-ink); }
+
+.foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding-top: 8px; }
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 2px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-family: var(--font-data);
+  font-size: 14px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.link svg { width: 16px; height: 16px; }
+.link:hover:not(:disabled) { color: var(--fg); }
+.link:disabled { opacity: 0.45; cursor: default; }
+
+/* Sheets */
+.sheet {
+  border: 0;
+  padding: 0;
+  margin: auto auto 0;
+  width: 100%;
+  max-width: 520px;
+  max-height: 100%;
+  border-radius: 26px 26px 0 0;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+}
+.sheet::backdrop { background: var(--scrim); }
+.sheet[open] { animation: rise 0.22s ease-out; }
+@keyframes rise { from { transform: translateY(24px); opacity: 0; } }
+.sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-inline: 20px;
+  padding-block: 22px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+.sheet h3 { margin: 0; font-size: 20px; font-weight: 600; text-wrap: balance; outline: none; }
+.sheet .sub { margin: -8px 0 0; color: var(--muted); font-size: 14px; }
+
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field > span {
+  font-family: var(--font-data);
+  font-size: 12.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.field select {
+  display: block;
+  width: 100%;
+  min-height: 50px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 500 16px var(--font-ui);
+}
+
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.seg-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  border: 2px solid transparent;
+  border-radius: 18px;
+  font-family: var(--font-data);
+  font-size: 18px;
+  font-weight: 500;
+  cursor: pointer;
+  opacity: 0.55;
+  touch-action: manipulation;
+}
+.seg-btn.wfh { background: var(--wfh-tile); color: var(--wfh-ink); }
+.seg-btn.office { background: var(--office-tile); color: var(--office-ink); }
+.seg-btn.off { grid-column: 1 / -1; background: var(--off-tile); color: var(--off-ink); }
+.seg-btn[aria-checked="true"] { opacity: 1; border-color: currentColor; }
+
+.note { margin: 0; min-height: 1.4em; color: var(--office-ink); font-size: 14px; }
+
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.spacer { flex: 1; }
+.btn {
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: none;
+  color: var(--fg);
+  font: 500 15px var(--font-ui);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.btn.primary { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+.btn.primary:disabled { opacity: 0.4; cursor: default; }
+.btn.danger { padding-inline: 4px; border-color: transparent; color: var(--danger); }
+
+.sheet textarea {
+  width: 100%;
+  min-width: 0;
+  resize: vertical;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.5 var(--font-data);
+}
+.sheet-msg { margin: 0; min-height: 1.4em; color: var(--muted); font-size: 14px; }
+.restore { display: flex; border-top: 1px solid var(--line); padding-top: 6px; }
+
+/* Toast */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 12px 12px 12px 18px;
+  border-radius: 16px;
+  background: var(--toast-bg);
+  color: var(--toast-fg);
+  font-size: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 140%);
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+.toast.show { opacity: 1; pointer-events: auto; transform: translate(-50%, 0); }
+.toast button {
+  padding: 6px 8px;
+  border: 0;
+  background: none;
+  color: var(--toast-accent);
+  font: 600 15px var(--font-ui);
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<main class="app">
+  <div class="tiles" role="group" aria-label="Log today">
+    <button type="button" class="tile wfh" data-place="wfh" aria-label="Log today as working from home">
+      <span class="mark" aria-hidden="true">today</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 10.5 7.2 4h9.6l4.2 6.5Z"/>
+        <path d="M5 10.5V20h14v-9.5"/>
+        <path d="M10 20v-5h4v5"/>
+      </svg>
+      <span class="tile-label">wfh</span>
+    </button>
+    <button type="button" class="tile office" data-place="office" aria-label="Log today as an office day">
+      <span class="mark" aria-hidden="true">today</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="5" y="3" width="14" height="18" rx="1.5"/>
+        <path d="M9 7h1.5M13.5 7H15M9 11h1.5M13.5 11H15M9 15h1.5M13.5 15H15"/>
+        <path d="M10.5 21v-2.5h3V21"/>
+      </svg>
+      <span class="tile-label">office</span>
+    </button>
+    <button type="button" class="tile off" data-place="off" aria-label="Log today as a day you didn't work">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="8.5"/>
+        <path d="M10 9v6M14 9v6"/>
+      </svg>
+      <span class="tile-label">didn't work</span>
+      <span class="mark" aria-hidden="true">today</span>
+    </button>
+  </div>
+
+  <section aria-labelledby="logTitle">
+    <div class="loghead">
+      <h2 id="logTitle">work log</h2>
+      <div class="legend" aria-hidden="true">
+        <span><i class="dot ring"></i>wfh</span>
+        <span><i class="dot fill"></i>office</span>
+        <span><i class="dot dash"></i>didn't work</span>
+      </div>
+    </div>
+    <p class="status" id="status" hidden></p>
+    <button type="button" class="link" id="restoreEmpty" hidden>Moving from another phone? Restore from an export file</button>
+    <div id="list"></div>
+    <div class="foot">
+      <button type="button" class="link" id="addBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        Add a past day
+      </button>
+      <button type="button" class="link" id="exportBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
+        Export .md
+      </button>
+    </div>
+  </section>
+</main>
+
+<dialog class="sheet" id="editSheet" aria-labelledby="editTitle">
+  <form class="sheet-body" id="editForm" novalidate>
+    <h3 id="editTitle" tabindex="-1" autofocus>Edit day</h3>
+    <label class="field" for="editDay">
+      <span>Day</span>
+      <select id="editDay"></select>
+    </label>
+    <div class="seg" role="radiogroup" aria-label="Where you worked">
+      <button type="button" class="seg-btn wfh" data-place="wfh" role="radio" aria-checked="false"><i class="dot"></i>wfh</button>
+      <button type="button" class="seg-btn office" data-place="office" role="radio" aria-checked="false"><i class="dot"></i>office</button>
+      <button type="button" class="seg-btn off" data-place="off" role="radio" aria-checked="false"><i class="dot"></i>didn't work</button>
+    </div>
+    <p class="note" id="editNote" aria-live="polite"></p>
+    <div class="actions">
+      <button type="button" class="btn danger" id="deleteBtn">Delete</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" id="cancelBtn">Cancel</button>
+      <button type="submit" class="btn primary" id="saveBtn">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="sheet" id="exportSheet" aria-labelledby="exportTitle">
+  <div class="sheet-body">
+    <h3 id="exportTitle" tabindex="-1" autofocus>Export as markdown</h3>
+    <p class="sub" id="exportSummary"></p>
+    <textarea id="exportText" rows="8" readonly spellcheck="false" aria-label="Markdown export"></textarea>
+    <div class="actions">
+      <button type="button" class="btn" id="exportClose">Close</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" id="copyBtn">Copy text</button>
+      <button type="button" class="btn primary" id="downloadBtn">Download .md</button>
+    </div>
+    <p class="sheet-msg" id="exportMsg" aria-live="polite"></p>
+    <div class="restore">
+      <button type="button" class="link" id="restoreBtn">Restore from an export file</button>
+    </div>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite">
+  <span id="toastMsg"></span>
+  <button type="button" id="toastUndo" hidden>Undo</button>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const KEY = 'work-log.v1';
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const PLACES = ['wfh', 'office', 'off'];
+  const LABEL = { wfh: 'wfh', office: 'office', off: "didn't work" };
+  const SPOKEN = { wfh: 'working from home', office: 'office', off: "didn't work" };
+  const TILE_LABEL = { wfh: 'Log today as working from home', office: 'Log today as an office day', off: "Log today as a day you didn't work" };
+  const FROM_LABEL = { wfh: 'wfh', office: 'office', "didn't work": 'off', 'didnt work': 'off', off: 'off' };
+  const CHEVRON = '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+
+  const $ = id => document.getElementById(id);
+  const els = {
+    tiles: Array.from(document.querySelectorAll('.tile')),
+    list: $('list'), status: $('status'), restoreEmpty: $('restoreEmpty'),
+    add: $('addBtn'), exportBtn: $('exportBtn'),
+    editSheet: $('editSheet'), editForm: $('editForm'), editTitle: $('editTitle'), day: $('editDay'),
+    note: $('editNote'), seg: Array.from(document.querySelectorAll('.seg-btn')),
+    save: $('saveBtn'), del: $('deleteBtn'), cancel: $('cancelBtn'),
+    exportSheet: $('exportSheet'), summary: $('exportSummary'), text: $('exportText'), exportMsg: $('exportMsg'),
+    copy: $('copyBtn'), download: $('downloadBtn'), exportClose: $('exportClose'), restore: $('restoreBtn'),
+    toast: $('toast'), toastMsg: $('toastMsg'), undo: $('toastUndo'),
+  };
+
+  const pad = n => String(n).padStart(2, '0');
+  const iso = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+  const todayIso = () => iso(new Date());
+  const shift = (k, n) => { const d = parse(k); d.setDate(d.getDate() + n); return iso(d); };
+  const isDate = s => typeof s === 'string' && DATE_RE.test(s) && iso(parse(s)) === s;
+  const isWeekday = k => { const w = parse(k).getDay(); return w > 0 && w < 6; };
+  const fmtDay = k => { const d = parse(k); return `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}`; };
+  const fmtMonth = key => { const [y, m] = key.split('-').map(Number); return `${MONTHS[m - 1]} ${y}`; };
+
+  /* ---------- saving: the log lives in this browser's storage on this phone ---------- */
+
+  let canSave = true;
+
+  function read() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); } catch (_) { canSave = false; return new Map(); }
+    if (!raw) return new Map();
+    try {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        const m = new Map();
+        for (const e of list) {
+          if (e && isDate(e.date) && PLACES.includes(e.place)) m.set(e.date, { place: e.place, at: Number(e.at) || 0 });
+        }
+        return m;
+      }
+    } catch (_) {}
+    // Unreadable: keep the raw text aside instead of letting the next save overwrite it.
+    try { localStorage.setItem(KEY + '.unreadable', raw); } catch (_) {}
+    return new Map();
+  }
+
+  let days = read();
+
+  function write() {
+    const list = [...days.keys()].sort().map(date => ({ date, place: days.get(date).place, at: days.get(date).at }));
+    try { localStorage.setItem(KEY, JSON.stringify(list)); canSave = true; }
+    catch (_) { canSave = false; }
+  }
+
+  // Pick up changes made in another tab, without dropping anything that failed to save here.
+  function sync() {
+    const fresh = read();
+    if (canSave) days = fresh;
+  }
+
+  // Ask the browser not to clear this data when the phone is short on space.
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (_) {}
+
+  const snapshot = () => new Map(days);
+
+  function commit(message, before) {
+    write();
+    render();
+    if (!canSave) { toast("Couldn't save on this phone."); return; }
+    toast(message, () => { days = before; write(); render(); });
+  }
+
+  /* ---------- drawing ---------- */
+
+  let lastSig = '';
+
+  function render() {
+    const today = todayIso();
+    const todayEntry = days.get(today);
+    for (const t of els.tiles) {
+      const place = t.dataset.place;
+      const logged = !!todayEntry && todayEntry.place === place;
+      t.classList.toggle('is-today', logged);
+      t.setAttribute('aria-label', TILE_LABEL[place] + (logged ? ' (logged)' : ''));
+    }
+
+    const dates = [...days.keys()].sort().reverse();
+    els.exportBtn.disabled = dates.length === 0;
+    els.restoreEmpty.hidden = dates.length > 0 || !canSave;
+
+    let message = '';
+    if (!canSave) message = "This browser won't save entries, so they'll be lost when the page closes.";
+    else if (!dates.length) message = 'No days logged yet. On weekdays, tap a button above to log today. Tap a day here later to change it.';
+    els.status.textContent = message;
+    els.status.hidden = !message;
+
+    const sig = today + '|' + dates.map(d => d + days.get(d).place).join(',');
+    if (sig === lastSig) return;
+    lastSig = sig;
+
+    const counts = new Map();
+    for (const d of dates) {
+      const key = d.slice(0, 7);
+      const c = counts.get(key) || { wfh: 0, office: 0, off: 0 };
+      c[days.get(d).place] += 1;
+      counts.set(key, c);
+    }
+
+    const frag = document.createDocumentFragment();
+    let currentKey = null;
+    for (const d of dates) {
+      const key = d.slice(0, 7);
+      if (key !== currentKey) {
+        currentKey = key;
+        const c = counts.get(key);
+        const head = document.createElement('div');
+        head.className = 'month';
+        const name = document.createElement('span');
+        name.textContent = fmtMonth(key);
+        const tally = document.createElement('span');
+        tally.className = 'counts';
+        const parts = [];
+        if (c.office) parts.push(`${c.office} office`);
+        if (c.wfh) parts.push(`${c.wfh} wfh`);
+        if (c.off) parts.push(`${c.off} didn't work`);
+        tally.textContent = parts.join(' · ');
+        head.append(name, tally);
+        frag.append(head);
+      }
+      const place = days.get(d).place;
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'row' + (d === today ? ' today' : '');
+      row.dataset.date = d;
+      row.setAttribute('aria-label', `${fmtDay(d)}: ${SPOKEN[place]}. Edit`);
+      const day = document.createElement('span');
+      day.className = 'd';
+      day.textContent = fmtDay(d);
+      const pill = document.createElement('span');
+      pill.className = 'pill ' + place;
+      const dot = document.createElement('i');
+      dot.className = 'dot';
+      pill.append(dot, document.createTextNode(LABEL[place]));
+      row.append(day, pill);
+      row.insertAdjacentHTML('beforeend', CHEVRON);
+      frag.append(row);
+    }
+
+    const active = document.activeElement;
+    const focusDate = active && active.classList && active.classList.contains('row') ? active.dataset.date : null;
+    els.list.replaceChildren(frag);
+    if (focusDate) {
+      const again = els.list.querySelector(`.row[data-date="${focusDate}"]`);
+      if (again) again.focus({ preventScroll: true });
+    }
+  }
+
+  /* ---------- toast ---------- */
+
+  let toastTimer = 0;
+  function toast(message, undo) {
+    els.toastMsg.textContent = message;
+    els.undo.hidden = !undo;
+    els.undo.onclick = undo ? () => { hideToast(); undo(); toast('Undone'); } : null;
+    els.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, undo ? 6000 : 2800);
+  }
+  function hideToast() {
+    clearTimeout(toastTimer);
+    els.toast.classList.remove('show');
+  }
+
+  /* ---------- logging today ---------- */
+
+  function flash(el) {
+    el.classList.remove('flash');
+    void el.offsetWidth;
+    el.classList.add('flash');
+  }
+
+  function logToday(place, tile) {
+    const date = todayIso();
+    const prev = days.get(date);
+    if (prev && prev.place === place) { toast('Already logged today.'); return; }
+    const before = snapshot();
+    days.set(date, { place, at: Date.now() });
+    flash(tile);
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) {}
+    commit(prev ? `Today: ${LABEL[place]} (was ${LABEL[prev.place]})` : `Today: ${LABEL[place]}`, before);
+  }
+
+  /* ---------- editing a day ---------- */
+
+  let editing = null;
+  let needsReload = false;   // a newer version arrived while a sheet was open
+
+  // The last 60 days, plus whichever day is being edited. Logged days show what's there.
+  function fillDays(selected) {
+    const today = todayIso();
+    const keys = new Set([selected]);
+    for (let i = 0; i < 60; i++) keys.add(shift(today, -i));
+    const options = [...keys].sort().reverse().map(k => {
+      const o = document.createElement('option');
+      o.value = k;
+      let text = fmtDay(k);
+      if (k === today) text = 'Today · ' + text;
+      else if (k === shift(today, -1)) text = 'Yesterday · ' + text;
+      const e = days.get(k);
+      if (e) text += ` (${LABEL[e.place]})`;
+      o.textContent = text;
+      return o;
+    });
+    els.day.replaceChildren(...options);
+    els.day.value = selected;
+  }
+
+  // Adding a day starts on the latest weekday you missed since you started logging, else yesterday.
+  function defaultAddDate() {
+    const yesterday = shift(todayIso(), -1);
+    const first = [...days.keys()].sort()[0];
+    if (!first) return yesterday;
+    for (let k = yesterday, i = 0; k >= first && i < 59; k = shift(k, -1), i++) {
+      if (isWeekday(k) && !days.has(k)) return k;
+    }
+    return yesterday;
+  }
+
+  function paintSeg() {
+    for (const b of els.seg) b.setAttribute('aria-checked', String(!!editing && b.dataset.place === editing.place));
+  }
+
+  function validate() {
+    if (!editing) return;
+    const d = els.day.value;
+    let note = '';
+    const ok = !!editing.place && isDate(d);
+    if (ok && d !== editing.orig && days.has(d)) note = `${fmtDay(d)} already has an entry (${LABEL[days.get(d).place]}). Saving replaces it.`;
+    const current = editing.orig ? days.get(editing.orig) : null;
+    const unchanged = !!current && d === editing.orig && editing.place === current.place;
+    els.save.disabled = !ok || unchanged;
+    els.note.textContent = note;
+  }
+
+  function openEdit(orig) {
+    const current = orig ? days.get(orig) : null;
+    if (orig && !current) return;
+    editing = { orig: orig || null, place: current ? current.place : null };
+    els.editTitle.textContent = orig ? `Edit ${fmtDay(orig)}` : 'Add a past day';
+    fillDays(orig || defaultAddDate());
+    els.del.hidden = !orig;
+    paintSeg();
+    validate();
+    if (!els.editSheet.open) els.editSheet.showModal();
+  }
+
+  els.editForm.addEventListener('submit', e => {
+    e.preventDefault();
+    if (!editing || els.save.disabled) return;
+    const d = els.day.value;
+    const { place, orig } = editing;
+    const before = snapshot();
+    if (orig && orig !== d) days.delete(orig);
+    days.set(d, { place, at: Date.now() });
+    els.editSheet.close();
+    commit(orig ? `Saved ${fmtDay(d)}` : `Added ${fmtDay(d)}`, before);
+  });
+
+  els.del.addEventListener('click', () => {
+    if (!editing || !editing.orig) return;
+    const orig = editing.orig;
+    const before = snapshot();
+    days.delete(orig);
+    els.editSheet.close();
+    commit(`Deleted ${fmtDay(orig)}`, before);
+  });
+
+  els.seg.forEach(b => b.addEventListener('click', () => {
+    if (!editing) return;
+    editing.place = b.dataset.place;
+    paintSeg();
+    validate();
+  }));
+  els.day.addEventListener('change', validate);
+  els.cancel.addEventListener('click', () => els.editSheet.close());
+
+  /* ---------- export and restore ---------- */
+
+  function markdown() {
+    const dates = [...days.keys()].sort();
+    const rows = dates.map(d => `| ${d} | ${DAYS[parse(d).getDay()]} | ${LABEL[days.get(d).place]} |`);
+    return [
+      '# Work log',
+      '',
+      `Source: Work Log app (office / WFH), exported ${todayIso()}`,
+      "Place is wfh, office or didn't work. Weekends aren't logged unless worked; a weekday with no row wasn't logged.",
+      '',
+      '| date       | day | place       |',
+      '|------------|-----|-------------|',
+      ...rows,
+      '',
+    ].join('\n');
+  }
+
+  function openExport() {
+    if (!days.size) return;
+    const dates = [...days.keys()].sort();
+    const n = dates.length;
+    els.summary.textContent = `${n} ${n === 1 ? 'day' : 'days'}, ${dates[0]} to ${dates[n - 1]}.`;
+    els.text.value = markdown();
+    els.exportMsg.textContent = '';
+    if (!els.exportSheet.open) els.exportSheet.showModal();
+  }
+
+  els.copy.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(els.text.value);
+      els.exportMsg.textContent = 'Copied.';
+    } catch (_) {
+      els.text.focus();
+      els.text.select();
+      els.exportMsg.textContent = 'Selected. Copy it from the box.';
+    }
+  });
+
+  els.download.addEventListener('click', () => {
+    const name = `work-log_${todayIso()}.md`;
+    const url = URL.createObjectURL(new Blob([els.text.value], { type: 'text/markdown' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.hidden = true;
+    els.exportSheet.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    els.exportMsg.textContent = `Downloading ${name}`;
+  });
+
+  // Reads rows like "| 2026-10-06 | Tue | wfh |" from an export.
+  function parseExport(text) {
+    const out = new Map();
+    const today = todayIso();
+    for (const line of String(text).split(/\r?\n/)) {
+      const m = line.match(/^\s*\|\s*(\d{4}-\d{2}-\d{2})\s*\|(?:[^|]*\|)?\s*([^|]*?)\s*\|\s*$/);
+      if (!m || !isDate(m[1]) || m[1] > today) continue;
+      const place = FROM_LABEL[m[2].toLowerCase().replace(/[‘’]/g, "'")];
+      if (place) out.set(m[1], place);
+    }
+    return out;
+  }
+
+  // Restoring only fills in days that are missing here, so it never overwrites newer entries.
+  async function restoreFrom(file) {
+    let text = '';
+    try { text = await file.text(); } catch (_) { toast("Couldn't read that file."); return; }
+    const rows = parseExport(text);
+    if (els.exportSheet.open) els.exportSheet.close();
+    if (!rows.size) { toast('No days found in that file.'); return; }
+    const before = snapshot();
+    let added = 0;
+    let kept = 0;
+    for (const [d, place] of rows) {
+      if (days.has(d)) { kept += 1; continue; }
+      days.set(d, { place, at: Date.now() });
+      added += 1;
+    }
+    if (!added) { toast('Every day in that file is already here.'); return; }
+    commit(`Restored ${added} ${added === 1 ? 'day' : 'days'}` + (kept ? `, kept ${kept} already here` : ''), before);
+  }
+
+  function pickFile(container) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.md,.txt,text/markdown,text/plain';
+    input.hidden = true;
+    input.addEventListener('change', () => {
+      const f = input.files && input.files[0];
+      input.remove();
+      if (f) restoreFrom(f);
+    });
+    input.addEventListener('cancel', () => input.remove());
+    container.append(input);
+    input.click();
+  }
+
+  els.restore.addEventListener('click', () => pickFile(els.exportSheet));
+  els.restoreEmpty.addEventListener('click', () => pickFile(document.body));
+  els.exportClose.addEventListener('click', () => els.exportSheet.close());
+
+  /* ---------- wiring ---------- */
+
+  els.tiles.forEach(t => t.addEventListener('click', () => logToday(t.dataset.place, t)));
+  els.tiles.forEach(t => t.addEventListener('animationend', () => t.classList.remove('flash')));
+  els.list.addEventListener('click', e => {
+    const row = e.target.closest('.row');
+    if (row) openEdit(row.dataset.date);
+  });
+  els.add.addEventListener('click', () => openEdit(null));
+  els.exportBtn.addEventListener('click', openExport);
+
+  for (const sheet of [els.editSheet, els.exportSheet]) {
+    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.close(); });
+    sheet.addEventListener('close', () => {
+      if (sheet === els.editSheet) editing = null;
+      if (needsReload) location.reload();
+    });
+  }
+
+  window.addEventListener('storage', e => { if (e.key === KEY || e.key === null) { sync(); render(); } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { sync(); render(); } });
+  setInterval(render, 60000);
+  render();
+
+  if ('serviceWorker' in navigator) {
+    // When a newer version of the page takes over, reload once so it shows up without any effort.
+    const hadWorker = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadWorker) return;
+      if (els.editSheet.open || els.exportSheet.open) needsReload = true; else location.reload();
+    });
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+  }
+})();
+</script>
+</body>
+</html>
