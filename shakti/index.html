@@ -1,0 +1,912 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Shakti &amp; Meditation</title>
+<meta name="theme-color" content="#F5F1EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171514" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Recursive:wght,CASL,MONO@400..700,0..1,0..1&display=swap">
+<style>
+/* Layout: two big tiles (shakti mat, meditation) on top; a day-by-day docket of tappable sessions underneath. */
+:root {
+  color-scheme: light dark;
+  --ground: #F5F1EC;   /* warm sand */
+  --ink: #2F2B2A;
+  --muted: #6B6460;
+  --rule: #E3DCD4;
+  --shakti: #F4D6C8;   /* the mat: terracotta */
+  --shakti-ink: #8F3A22;
+  --sit: #E4DAEE;      /* meditation: dusk plum */
+  --sit-ink: #5A3A7E;
+  --sheet: #FBF9F6;
+  --scrim: rgba(36, 28, 26, .34);
+  --danger: #A0443A;
+  --font-ui: "Recursive", ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-time: "Recursive", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #171514; --ink: #E9E4DE; --muted: #9B948C; --rule: #2A2624;
+    --shakti: #402820; --shakti-ink: #F2B59D; --sit: #2C2238; --sit-ink: #CDB6E8;
+    --sheet: #211E1C; --scrim: rgba(0, 0, 0, .55); --danger: #E68B7F;
+  }
+}
+
+html { background: var(--ground); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-variation-settings: "CASL" 1, "MONO" 0;
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap {
+  max-width: 520px;
+  margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(120px + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  gap: 24px;
+}
+
+/* the two buttons */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tile {
+  appearance: none;
+  border: 0;
+  border-radius: 26px;
+  min-width: 0;
+  height: clamp(168px, 33vh, 260px);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 620;
+  letter-spacing: .01em;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform .12s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.tile svg {
+  width: 58px; height: 58px;
+  fill: none; stroke: currentColor; stroke-width: 1.7;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.tile.shakti { background: var(--shakti); color: var(--shakti-ink); }
+.tile.meditation { background: var(--sit); color: var(--sit-ink); }
+.tile:active { transform: scale(.97); }
+.tile:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+.tile.flash { animation: flash .6s ease-out; }
+@keyframes flash { from { filter: brightness(1.1) saturate(1.2); } to { filter: none; } }
+
+/* the log */
+.log-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13px;
+  color: var(--muted);
+}
+.log-head .name { color: var(--ink); font-weight: 650; letter-spacing: .02em; }
+.status { color: var(--muted); font-weight: 450; }
+.status::before { content: "· "; }
+.legend { display: flex; gap: 14px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.copy-btn {
+  appearance: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 560;
+  color: var(--muted);
+  padding: 11px 8px;
+  margin: -11px 0 -11px 2px;   /* a bigger tap target without making the header taller */
+  border-radius: 10px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.copy-btn:active { transform: scale(.95); }
+.copy-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+/* the mat is a ring, meditation is solid, so the two never rely on colour alone */
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; box-sizing: border-box; flex: none; }
+.dot.shakti { border: 2px solid var(--shakti-ink); }
+.dot.meditation { background: var(--sit-ink); }
+
+.days { list-style: none; margin: 0; padding: 0; }
+.month {
+  padding-block: 18px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.month:first-child { padding-top: 8px; }
+.day {
+  display: grid;
+  grid-template-columns: 5.7em 1fr;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding-block: 6px;
+  border-bottom: 1px solid var(--rule);
+}
+.date { font-size: 14px; color: var(--muted); white-space: nowrap; }
+.day.today .date { color: var(--ink); font-weight: 650; }
+.sessions { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.none { color: var(--muted); padding-left: 4px; }
+.chip {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px 8px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-time);
+  font-variation-settings: "MONO" 1, "CASL" 1;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  color: var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.chip.shakti { background: var(--shakti); }
+.chip.meditation { background: var(--sit); }
+.chip .len { font-size: 13px; font-weight: 650; }
+.chip.shakti .len { color: var(--shakti-ink); }
+.chip.meditation .len { color: var(--sit-ink); }
+.chip .len.unset { font-weight: 450; }
+.chip:active { transform: scale(.95); }
+.chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.chip.new { animation: pop .38s cubic-bezier(.3, 1.4, .5, 1); }
+@keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.empty { margin: 0; padding-top: 14px; max-width: 34ch; font-size: 14px; color: var(--muted); }
+
+/* edit sheet */
+.sheet {
+  border: 0;
+  padding: 0;
+  margin: auto auto 0;
+  width: 100%;
+  max-width: 520px;
+  max-height: 100%;
+  box-sizing: border-box;
+  border-radius: 26px 26px 0 0;
+  background: var(--sheet);
+  color: var(--ink);
+}
+.sheet::backdrop { background: var(--scrim); }
+.sheet[open] { animation: slide .22s ease-out; }
+@keyframes slide { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.edit {
+  display: grid;
+  gap: 18px;
+  padding: 22px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+}
+.edit h2 { margin: 0; font-size: 18px; font-weight: 650; outline: none; }
+.seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.seg input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.seg label {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  height: 50px;
+  border-radius: 16px;
+  border: 1.5px solid var(--rule);
+  font-weight: 600;
+  cursor: pointer;
+}
+#kind-shakti:checked + label { background: var(--shakti); border-color: var(--shakti); color: var(--shakti-ink); }
+#kind-meditation:checked + label { background: var(--sit); border-color: var(--sit); color: var(--sit-ink); }
+.seg input:focus-visible + label { outline: 2px solid var(--ink); outline-offset: 2px; }
+.fields { display: grid; grid-template-columns: 1.35fr 1fr; gap: 10px; }
+.field { display: grid; gap: 6px; min-width: 0; font-size: 13px; color: var(--muted); }
+.field input, .field select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 50px;
+  padding: 0 12px;
+  border: 1.5px solid var(--rule);
+  border-radius: 14px;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-time);
+  font-variation-settings: "MONO" 1, "CASL" 1;
+  font-size: 16px;
+}
+.field select { font-family: var(--font-ui); font-variation-settings: "CASL" 1, "MONO" 0; }
+.field input:focus-visible, .field select:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.field input.bad { border-color: var(--danger); }
+.nudge, .quick { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.nudge button, .quick button {
+  appearance: none;
+  height: 40px;
+  padding: 0;
+  border: 1.5px solid var(--rule);
+  border-radius: 12px;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-time);
+  font-variation-settings: "MONO" 1, "CASL" 1;
+  font-size: 13px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.nudge button:active, .quick button:active { transform: scale(.95); background: var(--rule); }
+.nudge button:focus-visible, .quick button:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.quick button[aria-pressed="true"], .quick button[aria-pressed="true"]:active { background: var(--ink); border-color: var(--ink); color: var(--ground); }
+.length { display: grid; gap: 10px; }
+.note { margin: 0; min-height: 1.4em; font-size: 13px; color: var(--muted); }
+.note.err { color: var(--danger); }
+.actions { display: flex; align-items: center; gap: 6px; }
+.actions .spacer { flex: 1; }
+.text-btn, .solid-btn {
+  appearance: none;
+  border: 0;
+  font: inherit;
+  font-weight: 620;
+  border-radius: 14px;
+  cursor: pointer;
+}
+.text-btn { background: none; color: var(--muted); padding: 12px 12px; }
+.text-btn.danger { color: var(--danger); padding-left: 4px; }
+.solid-btn { background: var(--ink); color: var(--ground); padding: 12px 24px; }
+.text-btn:focus-visible, .solid-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* copy-by-hand sheet, for browsers that won't write to the clipboard */
+.hint { margin: 0; font-size: 14px; color: var(--muted); }
+#csv-text {
+  width: 100%;
+  box-sizing: border-box;
+  height: min(40vh, 280px);
+  padding: 10px 12px;
+  border: 1.5px solid var(--rule);
+  border-radius: 14px;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-time);
+  font-variation-settings: "MONO" 1, "CASL" 1;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre;
+  resize: none;
+}
+#csv-text:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+/* toast */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: calc(100% - 32px);
+  max-width: 488px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 10px 16px;
+  min-height: 48px;
+  border-radius: 16px;
+  background: var(--ink);
+  color: var(--ground);
+  font-size: 15px;
+  z-index: 5;
+}
+.toast[hidden] { display: none; }
+.toast.rise { animation: rise .2s ease-out; }
+@keyframes rise { from { transform: translate(-50%, 10px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+.toast .msg { min-width: 0; margin-right: auto; }
+.toast button {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 10px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.toast button:focus-visible { outline: 2px solid var(--ground); outline-offset: 1px; }
+[hidden] { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="tiles" aria-label="Log a session">
+    <button type="button" class="tile shakti" id="log-shakti" aria-label="Log a shakti mat session now">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7.2 5.8h12.6a1.4 1.4 0 0 1 1.3 1.8l-2.5 9.2a1.4 1.4 0 0 1-1.3 1h-12.6a1.4 1.4 0 0 1-1.3-1.8l2.5-9.2a1.4 1.4 0 0 1 1.3-1z"/>
+        <path stroke-width="2.7" d="M9.7 9h.01M13 9h.01M16.3 9h.01M8.6 12h.01M11.9 12h.01M15.2 12h.01M7.6 15h.01M10.9 15h.01M14.2 15h.01"/>
+      </svg>
+      <span>shakti mat</span>
+    </button>
+    <button type="button" class="tile meditation" id="log-meditation" aria-label="Log a meditation session now">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 4c2.1 2.5 2.1 6.3 0 9.6-2.1-3.3-2.1-7.1 0-9.6z"/>
+        <path d="M11.6 13.6C8.2 13.9 5.6 12 5 8.2c3.2.1 5.6 2.1 6.6 5.4z"/>
+        <path d="M12.4 13.6c3.4.3 6-1.6 6.6-5.4-3.2.1-5.6 2.1-6.6 5.4z"/>
+        <path d="M3.4 14.4c1.9 3.4 4.9 5.2 8.6 5.2s6.7-1.8 8.6-5.2"/>
+      </svg>
+      <span>meditation</span>
+    </button>
+  </section>
+
+  <section class="log" aria-label="Session log">
+    <div class="log-head">
+      <div><span class="name">session log</span> <span class="status" id="status" hidden></span> <button type="button" class="copy-btn" id="copy-csv" aria-label="Copy CSV of the whole log">copy csv</button></div>
+      <div class="legend" aria-label="Key">
+        <span><i class="dot shakti" aria-hidden="true"></i>shakti mat</span>
+        <span><i class="dot meditation" aria-hidden="true"></i>meditation</span>
+      </div>
+    </div>
+    <ul class="days" id="days"></ul>
+    <p class="empty" id="empty">Tap a tile when a session starts. Then tap its time here to set how long it ran. Forgot to tap? Tap the tile anyway, then change its time.</p>
+  </section>
+</main>
+
+<dialog class="sheet" id="sheet" aria-labelledby="sheet-title">
+  <form class="edit" id="edit-form" novalidate>
+    <h2 id="sheet-title" tabindex="-1" autofocus>Edit session</h2>
+    <div class="seg" role="radiogroup" aria-label="Which session">
+      <input type="radio" name="kind" id="kind-shakti" value="shakti">
+      <label for="kind-shakti"><i class="dot shakti" aria-hidden="true"></i>shakti mat</label>
+      <input type="radio" name="kind" id="kind-meditation" value="meditation">
+      <label for="kind-meditation"><i class="dot meditation" aria-hidden="true"></i>meditation</label>
+    </div>
+    <div class="fields">
+      <label class="field" for="edit-day"><span>Day</span><select id="edit-day"></select></label>
+      <label class="field" for="edit-time"><span>Start, 24h</span><input type="text" id="edit-time" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" maxlength="8" placeholder="07:40" aria-describedby="edit-note"></label>
+    </div>
+    <div class="nudge" role="group" aria-label="Shift the start time">
+      <button type="button" data-min="-60">−1h</button>
+      <button type="button" data-min="-30">−30m</button>
+      <button type="button" data-min="-15">−15m</button>
+      <button type="button" data-min="15">+15m</button>
+      <button type="button" data-min="30">+30m</button>
+      <button type="button" data-min="60">+1h</button>
+    </div>
+    <div class="length">
+      <label class="field" for="edit-len"><span>Length, minutes</span><input type="text" id="edit-len" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" maxlength="14" placeholder="20" aria-describedby="edit-note"></label>
+      <div class="quick" role="group" aria-label="Common lengths">
+        <button type="button" data-mins="10" aria-pressed="false" aria-label="10 minutes">10m</button>
+        <button type="button" data-mins="15" aria-pressed="false" aria-label="15 minutes">15m</button>
+        <button type="button" data-mins="20" aria-pressed="false" aria-label="20 minutes">20m</button>
+        <button type="button" data-mins="30" aria-pressed="false" aria-label="30 minutes">30m</button>
+        <button type="button" data-mins="45" aria-pressed="false" aria-label="45 minutes">45m</button>
+        <button type="button" data-mins="60" aria-pressed="false" aria-label="1 hour">1h</button>
+      </div>
+      <p class="note" id="edit-note"></p>
+    </div>
+    <div class="actions">
+      <button type="button" class="text-btn danger" id="edit-delete">Delete</button>
+      <span class="spacer"></span>
+      <button type="button" class="text-btn" id="edit-cancel">Cancel</button>
+      <button type="submit" class="solid-btn" id="edit-save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="sheet" id="csv-sheet" aria-labelledby="csv-title">
+  <div class="edit">
+    <h2 id="csv-title" tabindex="-1">Copy the log</h2>
+    <p class="hint">This browser wouldn’t copy for you. Press and hold the text, choose Select all, then Copy.</p>
+    <textarea id="csv-text" readonly wrap="off" spellcheck="false" aria-label="The log as CSV"></textarea>
+    <div class="actions">
+      <span class="spacer"></span>
+      <button type="button" class="solid-btn" id="csv-close">Done</button>
+    </div>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden>
+  <span class="msg" id="toast-msg"></span>
+  <button type="button" id="toast-act" hidden>Length</button>
+  <button type="button" id="toast-undo">Undo</button>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const KEY = 'shakti-log.v1';
+
+  const $ = id => document.getElementById(id);
+  const els = {
+    shakti: $('log-shakti'), meditation: $('log-meditation'), days: $('days'), empty: $('empty'), status: $('status'),
+    sheet: $('sheet'), form: $('edit-form'), day: $('edit-day'), time: $('edit-time'), len: $('edit-len'), note: $('edit-note'),
+    del: $('edit-delete'), cancel: $('edit-cancel'),
+    toast: $('toast'), toastMsg: $('toast-msg'), act: $('toast-act'), undo: $('toast-undo'),
+    copy: $('copy-csv'), csvSheet: $('csv-sheet'), csvText: $('csv-text'), csvClose: $('csv-close'),
+  };
+  const quickBtns = [...document.querySelectorAll('.quick button')];
+
+  const pad = n => String(n).padStart(2, '0');
+  const dayKey = t => { const d = new Date(t); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); };
+  const clock = t => { const d = new Date(t); return pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+  const fromKey = k => { const p = k.split('-').map(Number); return new Date(p[0], p[1] - 1, p[2]); };
+  const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const MO = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dayLabel = k => { const d = fromKey(k); return WD[d.getDay()] + ' ' + d.getDate() + ' ' + MO[d.getMonth()]; };
+  const monthLabel = k => { const d = fromKey(k); return MO[d.getMonth()] + ' ' + d.getFullYear(); };
+  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  const NAMES = { shakti: 'Shakti mat', meditation: 'Meditation' };
+  const ACTIVITY = { shakti: 'shakti_mat', meditation: 'meditation' };
+  const kindName = k => NAMES[k] || '';
+
+  // A length is a whole number of minutes, from one minute to a full day. Anything else counts as "not set".
+  const goodMins = v => (Number.isInteger(v) && v >= 1 && v <= 1440 ? v : null);
+  const isSession = s => !!s && typeof s.id === 'string' && s.id.length > 0 &&
+    (s.kind === 'shakti' || s.kind === 'meditation') && Number.isFinite(s.at);
+
+  const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
+  // 25 -> 25m, 60 -> 1h, 65 -> 1h05
+  const lenShort = n => (n < 60 ? n + 'm' : Math.floor(n / 60) + 'h' + (n % 60 ? pad(n % 60) : ''));
+  // 90 -> 1 hour 30 minutes
+  const lenLong = n => [n >= 60 ? plural(Math.floor(n / 60), 'hour') : '', n % 60 ? plural(n % 60, 'minute') : ''].filter(Boolean).join(' ');
+
+  // ---------- saving: the log lives in this browser's storage on this phone ----------
+  let canSave = true;
+
+  function read() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); } catch (_) { canSave = false; return []; }
+    if (!raw) return [];
+    try {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        return list.filter(isSession)
+          .map(s => ({ id: s.id, kind: s.kind, at: s.at, mins: goodMins(s.mins) }))
+          .sort((a, b) => a.at - b.at);
+      }
+    } catch (_) {}
+    // Unreadable: keep the raw text aside instead of letting the next save overwrite it.
+    try { localStorage.setItem(KEY + '.unreadable', raw); } catch (_) {}
+    return [];
+  }
+
+  let log = read();
+
+  function write() {
+    try { localStorage.setItem(KEY, JSON.stringify(log)); canSave = true; }
+    catch (_) { canSave = false; }
+    renderStatus();
+  }
+
+  // Pick up changes made in another tab, without dropping anything that failed to save here.
+  function sync() {
+    const fresh = read();
+    if (canSave) log = fresh;
+  }
+
+  // Ask the browser not to clear this data when the phone is short on space.
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (_) {}
+
+  function put(e) {
+    log = log.filter(s => s.id !== e.id);
+    log.push({ id: e.id, kind: e.kind, at: e.at, mins: goodMins(e.mins) });
+    log.sort((a, b) => a.at - b.at);
+    write();
+    render();
+  }
+  function del(id) {
+    log = log.filter(s => s.id !== id);
+    write();
+    render();
+  }
+
+  // ---------- drawing the log ----------
+  let freshId = null, lastSig = '';
+
+  function monthRow(k) {
+    const li = document.createElement('li');
+    li.className = 'month';
+    li.textContent = monthLabel(k);
+    return li;
+  }
+  function dayRow(k, list, isToday) {
+    const li = document.createElement('li');
+    li.className = isToday ? 'day today' : 'day';
+    const date = document.createElement('span');
+    date.className = 'date';
+    date.textContent = dayLabel(k);
+    const box = document.createElement('span');
+    box.className = 'sessions';
+    if (list.length) {
+      for (const s of list) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip ' + s.kind + (s.id === freshId ? ' new' : '');
+        b.dataset.id = s.id;
+        b.setAttribute('aria-label', kindName(s.kind) + ' at ' + clock(s.at) + ', ' +
+          (s.mins ? lenLong(s.mins) : 'no length yet') + ', ' + dayLabel(k) + '. Edit');
+        const dot = document.createElement('i');
+        dot.className = 'dot ' + s.kind;
+        dot.setAttribute('aria-hidden', 'true');
+        const at = document.createElement('span');
+        at.className = 'at';
+        at.textContent = clock(s.at);
+        const len = document.createElement('span');
+        len.className = s.mins ? 'len' : 'len unset';
+        len.textContent = s.mins ? lenShort(s.mins) : 'no length';
+        b.append(dot, at, len);
+        box.append(b);
+      }
+    } else {
+      const none = document.createElement('span');
+      none.className = 'none';
+      none.textContent = '—';
+      box.append(none);
+    }
+    li.append(date, box);
+    return li;
+  }
+
+  function renderStatus() {
+    els.status.textContent = canSave ? '' : 'can’t save in this browser';
+    els.status.hidden = canSave;
+  }
+
+  function render() {
+    const byDay = new Map();
+    for (const s of log) {
+      const k = dayKey(s.at);
+      if (!byDay.has(k)) byDay.set(k, []);
+      byDay.get(k).push(s);
+    }
+    const today = dayKey(Date.now());
+    const signature = today + '|' + log.map(s => s.id + s.kind + s.at + ':' + s.mins).join(',');
+    if (signature !== lastSig) {
+      lastSig = signature;
+      const keys = [...byDay.keys()].sort();
+      const top = keys.length && keys[keys.length - 1] > today ? keys[keys.length - 1] : today;
+      const bottom = keys.length && keys[0] < today ? keys[0] : today;
+      const frag = document.createDocumentFragment();
+      const d = fromKey(top);
+      let lastMonth = '';
+      for (let i = 0; i < 5000; i++) {
+        const k = dayKey(d.getTime());
+        if (k.slice(0, 7) !== lastMonth) { lastMonth = k.slice(0, 7); frag.append(monthRow(k)); }
+        frag.append(dayRow(k, byDay.get(k) || [], k === today));
+        if (k <= bottom) break;
+        d.setDate(d.getDate() - 1);
+      }
+      els.days.replaceChildren(frag);
+      els.empty.hidden = byDay.size > 0;
+      freshId = null;
+    }
+    renderStatus();
+  }
+
+  // ---------- toast ----------
+  let toastTimer = 0;
+  let undoFn = null, actFn = null;
+  function toast(msg, undo, ms, act) {
+    els.toastMsg.textContent = msg;
+    undoFn = undo || null;
+    actFn = act ? act.fn : null;
+    els.undo.hidden = !undoFn;
+    els.act.hidden = !act;
+    if (act) els.act.textContent = act.label;
+    els.toast.hidden = false;
+    els.toast.classList.remove('rise');
+    void els.toast.offsetWidth;
+    els.toast.classList.add('rise');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, ms || (undoFn ? 5000 : 2600));
+  }
+  function hideToast() {
+    clearTimeout(toastTimer);
+    els.toast.hidden = true;
+    undoFn = null;
+    actFn = null;
+  }
+  els.undo.addEventListener('click', () => {
+    const f = undoFn;
+    hideToast();
+    if (f) { f(); toast('Undone', null, 1600); }
+  });
+  els.act.addEventListener('click', () => {
+    const f = actFn;
+    hideToast();
+    if (f) f();
+  });
+
+  // ---------- logging ----------
+  // A tap logs a session starting now, with no length yet. The length is set afterwards, from the log.
+  function logSession(kind, btn) {
+    const e = { id: newId(), kind, at: Date.now(), mins: null };
+    freshId = e.id;
+    put(e);
+    btn.classList.remove('flash');
+    void btn.offsetWidth;
+    btn.classList.add('flash');
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) {}
+    // (a non-breaking space keeps "at 07:40" together when a narrow phone wraps the message)
+    toast(kindName(kind) + ' logged at\u00a0' + clock(e.at), () => del(e.id), 6000, { label: 'Length', fn: () => openEdit(e.id) });
+  }
+  els.shakti.addEventListener('click', () => logSession('shakti', els.shakti));
+  els.meditation.addEventListener('click', () => logSession('meditation', els.meditation));
+
+  // ---------- editing ----------
+  const MIN = 60000;
+  let needsReload = false;   // a newer version arrived while the edit sheet was open
+
+  // Reads a typed time: 740, 0740, 7:40, 07:40, 7.40, 7, and a trailing am/pm. Gives { h, m } or null.
+  function parseTime(text) {
+    let s = String(text || '').trim().toLowerCase();
+    let ap = '';
+    const suffix = s.match(/\s*([ap])\.?\s*m?\.?$/);
+    if (suffix) { ap = suffix[1]; s = s.slice(0, suffix.index).trim(); }
+    s = s.replace(/\s*:\s*/g, ':').replace(/[.\s]+/g, ':');
+    let h, mi;
+    if (s.includes(':')) {
+      const parts = s.split(':');
+      if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[0]) || !/^\d{1,2}$/.test(parts[1])) return null;
+      h = +parts[0]; mi = +parts[1];
+    } else {
+      if (!/^\d{1,4}$/.test(s)) return null;
+      if (s.length <= 2) { h = +s; mi = 0; } else { h = +s.slice(0, -2); mi = +s.slice(-2); }
+    }
+    if (ap) {
+      if (h < 1 || h > 12) return null;
+      if (ap === 'p' && h < 12) h += 12;
+      if (ap === 'a' && h === 12) h = 0;
+    }
+    if (h > 23 || mi > 59) return null;
+    return { h, m: mi };
+  }
+
+  // Reads a typed length. Blank means "no length" (null). A number of minutes comes back as that number,
+  // anything that can't be read (or is under a minute or over a day) as undefined.
+  // Understands 20, 20m, 20 min, 1h, 1h30, 1h 30m, 1:30, 1.5h.
+  function parseMins(text) {
+    const s = String(text == null ? '' : text).trim().toLowerCase();
+    if (!s) return null;
+    const MINS = '(?:m|min|mins|minute|minutes)';
+    const HRS = '(?:h|hr|hrs|hour|hours)';
+    let m, total;
+    if ((m = s.match(new RegExp('^(\\d{1,4})\\s*' + MINS + '?$')))) total = +m[1];
+    else if ((m = s.match(/^(\d{1,2}):(\d{2})$/))) { if (+m[2] > 59) return undefined; total = +m[1] * 60 + +m[2]; }
+    else if ((m = s.match(new RegExp('^(\\d{1,2})\\s*' + HRS + '(?:\\s*(\\d{1,2})\\s*' + MINS + '?)?$')))) {
+      const extra = m[2] == null ? 0 : +m[2];
+      if (extra > 59) return undefined;
+      total = +m[1] * 60 + extra;
+    }
+    else if ((m = s.match(new RegExp('^(\\d{0,2}\\.\\d{1,2})\\s*' + HRS + '$')))) total = Math.round(parseFloat(m[1]) * 60);
+    else return undefined;
+    return total >= 1 && total <= 1440 ? total : undefined;
+  }
+
+  const keyShift = (k, n) => { const d = fromKey(k); d.setDate(d.getDate() + n); return dayKey(d.getTime()); };
+  function dayName(k) {
+    const today = dayKey(Date.now());
+    if (k === today) return 'Today · ' + dayLabel(k);
+    if (k === keyShift(today, -1)) return 'Yesterday · ' + dayLabel(k);
+    if (k === keyShift(today, 1)) return 'Tomorrow · ' + dayLabel(k);
+    return dayLabel(k);
+  }
+  // The last 30 days, plus tomorrow, plus whichever day this session is on.
+  function fillDays(selected) {
+    const today = dayKey(Date.now());
+    const set = new Set([selected]);
+    for (let i = -1; i <= 30; i++) set.add(keyShift(today, -i));
+    els.day.replaceChildren(...[...set].sort().reverse().map(k => {
+      const o = document.createElement('option');
+      o.value = k;
+      o.textContent = dayName(k);
+      return o;
+    }));
+    els.day.value = selected;
+  }
+  function fieldAt() {
+    const t = parseTime(els.time.value);
+    if (!t || !els.day.value) return null;
+    const p = els.day.value.split('-').map(Number);
+    return new Date(p[0], p[1] - 1, p[2], t.h, t.m).getTime();
+  }
+  const flag = (input, bad) => {
+    input.classList.toggle('bad', bad);
+    if (bad) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
+  };
+  function setFields(at) {
+    fillDays(dayKey(at));
+    els.time.value = clock(at);
+    flag(els.time, false);
+  }
+
+  // The line under the length: when the session ends, or what went wrong.
+  function refresh(error) {
+    const mins = parseMins(els.len.value);
+    for (const b of quickBtns) b.setAttribute('aria-pressed', String(mins === +b.dataset.mins));
+    let msg = '';
+    if (error) msg = error;
+    else if (mins === null) msg = 'No length yet.';
+    else if (mins) {
+      const at = fieldAt();
+      if (at != null) {
+        const end = at + mins * MIN;
+        const ek = dayKey(end), sk = dayKey(at);
+        const when = ek === sk ? '' : ek === keyShift(sk, 1) ? ' the next day' : ' on ' + dayLabel(ek);
+        msg = 'Ends ' + clock(end) + when + ' · ' + lenLong(mins);
+      }
+    }
+    els.note.textContent = msg;
+    els.note.classList.toggle('err', !!error);
+  }
+
+  let editing = null;
+  function openEdit(id) {
+    const s = log.find(x => x.id === id);
+    if (!s) return;
+    editing = { id: s.id, kind: s.kind, at: s.at, mins: s.mins };
+    document.getElementById('kind-' + s.kind).checked = true;
+    setFields(s.at);
+    els.len.value = s.mins == null ? '' : String(s.mins);
+    flag(els.len, false);
+    refresh();
+    if (!els.sheet.open) els.sheet.showModal();
+  }
+  function closeSheet() { if (els.sheet.open) els.sheet.close(); }
+
+  els.days.addEventListener('click', e => {
+    const chip = e.target.closest('.chip');
+    if (chip) openEdit(chip.dataset.id);
+  });
+  els.sheet.addEventListener('click', e => { if (e.target === els.sheet) closeSheet(); });
+  els.sheet.addEventListener('close', () => { editing = null; if (needsReload) location.reload(); });
+  els.cancel.addEventListener('click', closeSheet);
+  els.day.addEventListener('change', () => refresh());
+
+  // Tapping a field selects it all, so typing replaces it. (Phones place the cursor after the tap, so select again on finger-up.)
+  function selectOnFocus(input) {
+    let typed = false;
+    const select = () => { if (!typed) { try { input.select(); } catch (_) {} } };
+    input.addEventListener('focus', () => { typed = false; setTimeout(select, 0); });
+    input.addEventListener('pointerup', () => setTimeout(select, 0));
+    input.addEventListener('input', () => { typed = true; flag(input, false); refresh(); });
+  }
+  selectOnFocus(els.time);
+  selectOnFocus(els.len);
+  els.time.addEventListener('blur', () => {
+    const t = parseTime(els.time.value);
+    if (t) els.time.value = pad(t.h) + ':' + pad(t.m);
+    refresh();
+  });
+  els.len.addEventListener('blur', () => {
+    const n = parseMins(els.len.value);
+    if (n) els.len.value = String(n);
+    refresh();
+  });
+
+  for (const b of document.querySelectorAll('.nudge button')) {
+    b.addEventListener('click', () => {
+      const base = fieldAt() ?? (editing && editing.at);
+      if (base == null) return;
+      setFields(base + Number(b.dataset.min) * MIN);
+      refresh();
+    });
+  }
+  // A quick length fills the field; tapping the one that is already chosen clears it again.
+  for (const b of quickBtns) {
+    b.addEventListener('click', () => {
+      els.len.value = parseMins(els.len.value) === +b.dataset.mins ? '' : b.dataset.mins;
+      flag(els.len, false);
+      refresh();
+    });
+  }
+
+  els.form.addEventListener('submit', e => {
+    e.preventDefault();
+    const prev = editing;
+    if (!prev) { closeSheet(); return; }
+    const t = parseTime(els.time.value);
+    const mins = parseMins(els.len.value);
+    const dk = els.day.value;
+    flag(els.time, !t);
+    flag(els.len, mins === undefined);
+    if (!t || mins === undefined) {
+      refresh(!t ? 'Couldn’t read that start time. Try 740 or 7:40.' : 'Couldn’t read that length. Use minutes, like 20 or 90.');
+      (!t ? els.time : els.len).focus();
+      return;
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dk)) return;
+    const kind = els.form.elements.kind.value || prev.kind;
+    const p = dk.split('-').map(Number);
+    const unchanged = dk === dayKey(prev.at) && pad(t.h) + ':' + pad(t.m) === clock(prev.at);
+    const at = unchanged ? prev.at : new Date(p[0], p[1] - 1, p[2], t.h, t.m).getTime();
+    closeSheet();
+    if (kind === prev.kind && at === prev.at && mins === prev.mins) return;
+    put({ id: prev.id, kind, at, mins });
+    toast('Session updated', () => put(prev));
+  });
+
+  els.del.addEventListener('click', () => {
+    const prev = editing;
+    if (!prev) return;
+    closeSheet();
+    del(prev.id);
+    toast('Session deleted', () => put(prev));
+  });
+
+  // ---------- copying the log out ----------
+  // Local time with its offset, so a session at 07:40 reads the same whatever the clocks do.
+  function stamp(t) {
+    const d = new Date(t);
+    const off = -d.getTimezoneOffset(), a = Math.abs(off);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' +
+      pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) +
+      (off < 0 ? '-' : '+') + pad(Math.floor(a / 60)) + ':' + pad(a % 60);
+  }
+  const csvField = s => (/[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s);
+  // The whole log, oldest first: one row per session, keyed by its id. Minutes are blank until a length is set.
+  const buildCsv = () => 'id,start,activity,minutes\n' +
+    log.map(s => csvField(s.id) + ',' + stamp(s.at) + ',' + ACTIVITY[s.kind] + ',' + (s.mins == null ? '' : s.mins)).join('\n') + '\n';
+
+  els.copy.addEventListener('click', async () => {
+    sync();
+    if (!log.length) { toast('Nothing to copy yet'); return; }
+    const text = buildCsv();
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Copied ' + plural(log.length, 'session') + ' as CSV');
+    } catch (_) {
+      // Some browsers won't write to the clipboard: show the text so it can be copied by hand.
+      els.csvText.value = text;
+      if (!els.csvSheet.open) els.csvSheet.showModal();
+      els.csvText.focus();
+      els.csvText.select();
+    }
+  });
+  els.csvClose.addEventListener('click', () => els.csvSheet.close());
+  els.csvSheet.addEventListener('click', e => { if (e.target === els.csvSheet) els.csvSheet.close(); });
+
+  // ---------- start ----------
+  window.addEventListener('storage', e => { if (e.key === KEY || e.key === null) { sync(); render(); } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { sync(); render(); } });
+  setInterval(render, 60000);
+  render();
+
+  if ('serviceWorker' in navigator) {
+    // When a newer version of the page takes over, reload once so it shows up without any effort.
+    const hadWorker = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadWorker) return;
+      if (els.sheet.open) needsReload = true; else location.reload();
+    });
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+  }
+})();
+</script>
+</body>
+</html>

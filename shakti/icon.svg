@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#F4D6C8"/>
+  <defs>
+    <path id="p" d="M256 126C302 178 308 250 256 304C204 250 210 178 256 126Z"/>
+  </defs>
+  <g transform="translate(0 -22)">
+    <g fill="#8F3A22" stroke="#8F3A22" stroke-width="30" stroke-linejoin="round">
+      <path d="M186 322H404L360 416H142Z"/>
+    </g>
+    <g fill="#F4D6C8">
+      <circle cx="210" cy="352" r="11"/><circle cx="259" cy="352" r="11"/><circle cx="308" cy="352" r="11"/><circle cx="357" cy="352" r="11"/>
+      <circle cx="190" cy="383" r="11"/><circle cx="239" cy="383" r="11"/><circle cx="288" cy="383" r="11"/><circle cx="337" cy="383" r="11"/>
+    </g>
+    <g fill="#5A3A7E" stroke="#F4D6C8" stroke-width="12" stroke-linejoin="round" style="paint-order:stroke fill">
+      <use href="#p" transform="translate(256 304) rotate(-66) scale(.82) translate(-256 -304)"/>
+      <use href="#p" transform="translate(256 304) rotate(66) scale(.82) translate(-256 -304)"/>
+      <use href="#p" transform="translate(256 304) rotate(-33) scale(.92) translate(-256 -304)"/>
+      <use href="#p" transform="translate(256 304) rotate(33) scale(.92) translate(-256 -304)"/>
+      <use href="#p"/>
+    </g>
+  </g>
+</svg>
