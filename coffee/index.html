@@ -108,6 +108,23 @@ body {
 .status::before { content: "· "; }
 .legend { display: flex; gap: 14px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
+.copy-btn {
+  appearance: none;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 560;
+  color: var(--muted);
+  padding: 11px 8px;
+  margin: -11px 0 -11px 2px;   /* a bigger tap target without making the header taller */
+  border-radius: 10px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.copy-btn:active { transform: scale(.95); }
+.copy-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
 
 .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; box-sizing: border-box; flex: none; }
 .dot.home { border: 2px solid var(--mug-ink); }
@@ -248,6 +265,25 @@ body {
 .solid-btn { background: var(--ink); color: var(--ground); padding: 12px 24px; }
 .text-btn:focus-visible, .solid-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
+/* copy-by-hand sheet, for browsers that won't write to the clipboard */
+.hint { margin: 0; font-size: 14px; color: var(--muted); }
+#csv-text {
+  width: 100%;
+  box-sizing: border-box;
+  height: min(40vh, 280px);
+  padding: 10px 12px;
+  border: 1.5px solid var(--rule);
+  border-radius: 14px;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-time);
+  font-variation-settings: "MONO" 1, "CASL" 1;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+}
+#csv-text:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+
 /* toast */
 .toast {
   position: fixed;
@@ -319,7 +355,7 @@ body {
 
   <section class="log" aria-label="Coffee log">
     <div class="log-head">
-      <div><span class="name">coffee log</span> <span class="status" id="status" hidden></span></div>
+      <div><span class="name">coffee log</span> <span class="status" id="status" hidden></span> <button type="button" class="copy-btn" id="copy-csv" aria-label="Copy CSV of the whole log">copy csv</button></div>
       <div class="legend" aria-label="Key">
         <span><i class="dot home" aria-hidden="true"></i>home</span>
         <span><i class="dot out" aria-hidden="true"></i>out</span>
@@ -360,6 +396,18 @@ body {
   </form>
 </dialog>
 
+<dialog class="sheet" id="csv-sheet" aria-labelledby="csv-title">
+  <div class="edit">
+    <h2 id="csv-title" tabindex="-1">Copy the log</h2>
+    <p class="hint">This browser wouldn’t copy for you. Press and hold the text, choose Select all, then Copy.</p>
+    <textarea id="csv-text" readonly spellcheck="false" aria-label="The log as CSV"></textarea>
+    <div class="actions">
+      <span class="spacer"></span>
+      <button type="button" class="solid-btn" id="csv-close">Done</button>
+    </div>
+  </div>
+</dialog>
+
 <div class="toast" id="toast" role="status" aria-live="polite" hidden>
   <span class="msg" id="toast-msg"></span>
   <button type="button" id="toast-undo">Undo</button>
@@ -377,6 +425,7 @@ body {
     sheet: $('sheet'), form: $('edit-form'), day: $('edit-day'), time: $('edit-time'),
     del: $('edit-delete'), cancel: $('edit-cancel'),
     toast: $('toast'), toastMsg: $('toast-msg'), undo: $('toast-undo'),
+    copy: $('copy-csv'), csvSheet: $('csv-sheet'), csvText: $('csv-text'), csvClose: $('csv-close'),
   };
 
   const pad = n => String(n).padStart(2, '0');
@@ -680,6 +729,38 @@ body {
     del(prev.id);
     toast('Coffee deleted', () => put(prev));
   });
+
+  // ---------- copying the log out ----------
+  // Local time with its offset, so a coffee at 08:54 reads the same whatever the clocks do.
+  function stamp(t) {
+    const d = new Date(t);
+    const off = -d.getTimezoneOffset(), a = Math.abs(off);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' +
+      pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) +
+      (off < 0 ? '-' : '+') + pad(Math.floor(a / 60)) + ':' + pad(a % 60);
+  }
+  const csvField = s => (/[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s);
+  // The whole log, oldest first: one row per coffee, keyed by its id.
+  const buildCsv = () => 'id,time,place\n' +
+    cups.map(c => csvField(c.id) + ',' + stamp(c.at) + ',' + c.kind).join('\n') + '\n';
+
+  els.copy.addEventListener('click', async () => {
+    sync();
+    if (!cups.length) { toast('Nothing to copy yet'); return; }
+    const text = buildCsv();
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('Copied ' + cups.length + (cups.length === 1 ? ' coffee' : ' coffees') + ' as CSV');
+    } catch (_) {
+      // Some browsers won't write to the clipboard: show the text so it can be copied by hand.
+      els.csvText.value = text;
+      if (!els.csvSheet.open) els.csvSheet.showModal();
+      els.csvText.focus();
+      els.csvText.select();
+    }
+  });
+  els.csvClose.addEventListener('click', () => els.csvSheet.close());
+  els.csvSheet.addEventListener('click', e => { if (e.target === els.csvSheet) els.csvSheet.close(); });
 
   // ---------- start ----------
   window.addEventListener('storage', e => { if (e.key === KEY || e.key === null) { sync(); render(); } });
