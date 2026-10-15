@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-<title>Day Log</title>
+<title>Sleep Log</title>
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#ffffff">
 <link rel="manifest" href="manifest.json">
@@ -139,7 +139,7 @@ h1 { margin: 0; font-size: 32px; line-height: 1.2; font-weight: 700; }
 form { margin: 0; display: grid; gap: 8px; }
 .bare { margin: 0; padding: 0; border: 0; min-width: 0; }
 .rows { display: grid; gap: 10px; }
-.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
 .when { font-size: 14px; color: var(--text-2); font-variant-numeric: tabular-nums; }
 
 .seg { display: inline-flex; gap: 2px; margin: 0; padding: 2px; border: 0; min-width: 0; border-radius: 6px; background: var(--seg); }
@@ -147,7 +147,7 @@ form { margin: 0; display: grid; gap: 8px; }
 .segopt input { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .segopt label {
   display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 4px;
-  font-size: 14px; font-weight: 500; color: var(--text-2);
+  font-size: 14px; font-weight: 500; color: var(--text-2); white-space: nowrap;
 }
 .segopt label svg { flex: none; }
 .segopt input:checked + label { background: var(--bg); color: var(--text); box-shadow: 0 0 0 1px var(--ring); }
@@ -178,6 +178,7 @@ form { margin: 0; display: grid; gap: 8px; }
   min-width: 0; height: 44px; margin: 0; padding: 0 12px;
   font-size: 16px; color: var(--text); background: var(--fill);
   border: 0; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--ring);
+  text-overflow: ellipsis;
 }
 #note::placeholder { color: var(--text-2); opacity: 0.8; text-overflow: ellipsis; }
 #note:disabled { color: var(--text-3); }
@@ -194,6 +195,9 @@ form { margin: 0; display: grid; gap: 8px; }
   .head { padding-block: 28px 0; }
   h1 { font-size: 28px; }
 }
+@media (max-width: 360px) {
+  .segopt label { padding: 0 10px; }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
@@ -203,12 +207,12 @@ form { margin: 0; display: grid; gap: 8px; }
 <div class="app">
   <header class="col head">
     <div class="titlerow">
-      <h1>Day Log</h1>
+      <h1>Sleep Log</h1>
       <button type="button" id="copy" class="btn" disabled>Copy CSV</button>
     </div>
     <p class="sub" id="sub"></p>
     <ul class="legend" aria-label="What the numbers mean">
-      <li class="tag r1">1 · rough</li><li class="tag r2">2 · low</li><li class="tag r3">3 · okay</li><li class="tag r4">4 · good</li><li class="tag r5">5 · great</li>
+      <li class="tag r1">1 · awful</li><li class="tag r2">2 · poor</li><li class="tag r3">3 · okay</li><li class="tag r4">4 · good</li><li class="tag r5">5 · great</li>
     </ul>
   </header>
 
@@ -244,17 +248,17 @@ form { margin: 0; display: grid; gap: 8px; }
           <div class="rows">
             <div class="top">
               <fieldset class="seg">
-                <legend class="sr">Time of day</legend>
-                <span class="segopt"><input type="radio" name="slot" id="s-morning" value="morning"><label for="s-morning"><span id="ok" hidden><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Morning</label></span>
-                <span class="segopt"><input type="radio" name="slot" id="s-night" value="night"><label for="s-night">Night</label></span>
+                <legend class="sr">Before or after sleep</legend>
+                <span class="segopt"><input type="radio" name="slot" id="s-morning" value="morning"><label for="s-morning"><span id="ok" hidden><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>After sleep</label></span>
+                <span class="segopt"><input type="radio" name="slot" id="s-night" value="night"><label for="s-night">Before sleep</label></span>
               </fieldset>
               <span class="when" id="when"></span>
             </div>
 
             <fieldset class="scale">
               <legend class="sr">Rating from 1 to 5</legend>
-              <div class="opt o1"><input type="radio" name="rating" id="r1" value="1" aria-label="1, rough"><label for="r1" title="1 · rough">1</label></div>
-              <div class="opt o2"><input type="radio" name="rating" id="r2" value="2" aria-label="2, low"><label for="r2" title="2 · low">2</label></div>
+              <div class="opt o1"><input type="radio" name="rating" id="r1" value="1" aria-label="1, awful"><label for="r1" title="1 · awful">1</label></div>
+              <div class="opt o2"><input type="radio" name="rating" id="r2" value="2" aria-label="2, poor"><label for="r2" title="2 · poor">2</label></div>
               <div class="opt o3"><input type="radio" name="rating" id="r3" value="3" aria-label="3, okay"><label for="r3" title="3 · okay">3</label></div>
               <div class="opt o4"><input type="radio" name="rating" id="r4" value="4" aria-label="4, good"><label for="r4" title="4 · good">4</label></div>
               <div class="opt o5"><input type="radio" name="rating" id="r5" value="5" aria-label="5, great"><label for="r5" title="5 · great">5</label></div>
@@ -285,14 +289,18 @@ form { margin: 0; display: grid; gap: 8px; }
   'use strict';
 
   const SLOTS = ['morning', 'night'];
-  const SLOT_LABEL = { morning: 'Morning', night: 'Night' };
-  const PROMPT = { morning: 'How’s the day starting?', night: 'How did the day go?' };
-  const WORD = ['', 'rough', 'low', 'okay', 'good', 'great'];
+  // The stored slot names stay 'morning' and 'night' so entries already saved keep working.
+  // Morning is the After sleep entry, night is the Before sleep entry.
+  const SLOT_LABEL = { morning: 'After sleep', night: 'Before sleep' };
+  const SLOT_CSV = { morning: 'after_sleep', night: 'before_sleep' };
+  const SLOT_RANK = { night: 0, morning: 1 };   // within one night, Before sleep comes first
+  const PROMPT = { morning: 'How did you sleep?', night: 'How are you feeling about sleep?' };
+  const WORD = ['', 'awful', 'poor', 'okay', 'good', 'great'];
   const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const ROLLOVER = 4;      // a new log day starts at 04:00, so a 00:30 entry still belongs to the evening before
-  const NIGHT_FROM = 17;   // from 17:00 the clock suggests Night
-  const PAGE_DAYS = 5;
+  const NIGHT_FROM = 20;   // from 20:00 the clock suggests Before sleep
+  const PAGE_NIGHTS = 5;
   const MAX_DOCS = 1000;
   const KEY = 'day-log.v1';
   const DRAFT_KEY = 'day-log.draft.v1';
@@ -326,7 +334,7 @@ form { margin: 0; display: grid; gap: 8px; }
   let saveEntry = null;        // set once storage is reachable
   let entries = [];            // what storage holds
   const fresh = new Map();     // cloud mode: saved from this page, until the database echoes them back
-  let shownDays = PAGE_DAYS;
+  let shownNights = PAGE_NIGHTS;
   let slotPick = null;         // slot chosen by hand; null follows the clock
   let shownDay = '';           // the log day the composer was last set up for
   let help = null;             // { text, kind } shown in the helper line until the next input
@@ -366,10 +374,11 @@ form { margin: 0; display: grid; gap: 8px; }
   const addDays = (k, n) => { const d = parse(k); return keyOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)); };
   const longDay = (k) => { const d = parse(k); return WEEKDAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()]; };
   const shortDay = (k) => { const d = parse(k); return WEEKDAYS[d.getDay()].slice(0, 3) + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()].slice(0, 3); };
-  function dayLabel(k, today) {
-    if (k === today) return ['Today', shortDay(k)];
-    if (k === addDays(today, -1)) return ['Yesterday', shortDay(k)];
-    return [shortDay(k), ''];
+  // A night is named by the evening it starts on: Before sleep that evening, After sleep the next morning.
+  function nightLabel(n, today) {
+    if (n === today) return ['Tonight', shortDay(n)];
+    if (n === addDays(today, -1)) return ['Last night', shortDay(n)];
+    return ['Night of ' + shortDay(n), ''];
   }
   // Local time with its offset, so an entry at 08:12 reads the same whatever the clocks do later.
   function stamp(d) {
@@ -398,10 +407,21 @@ form { margin: 0; display: grid; gap: 8px; }
     return [...m.values()].sort(order);
   }
   const has = (date, slot) => all().some((e) => e.date === date && e.slot === slot);
-  function byDay(list) {
+
+  // Entries belong to a night: Before sleep on the evening it starts, After sleep on the morning after.
+  const nightOf = (e) => (e.slot === 'night' ? e.date : addDays(e.date, -1));
+  const byRank = (a, b) => SLOT_RANK[a.slot] - SLOT_RANK[b.slot];
+  function byNight(list) {
     const m = new Map();
-    for (const e of list) { if (!m.has(e.date)) m.set(e.date, []); m.get(e.date).push(e); }
-    return [...m.keys()].sort().map((d) => ({ date: d, items: m.get(d) }));
+    for (const e of list) { const n = nightOf(e); if (!m.has(n)) m.set(n, []); m.get(n).push(e); }
+    return [...m.keys()].sort().map((n) => ({ night: n, items: m.get(n).sort(byRank) }));
+  }
+  // A night is locked once nothing more can be added to it.
+  function nightLocked(g, today) {
+    if (g.items.length === 2) return true;            // both halves are in
+    if (g.night >= today) return false;               // tonight: Before sleep, or the After sleep that follows, is still to come
+    if (g.night === addDays(today, -1)) return has(today, 'morning') || has(today, 'night');   // last night waits for this morning's entry
+    return true;
   }
 
   // Where the composer stands right now: which day counts, what is logged, which slot is picked.
@@ -486,10 +506,15 @@ form { margin: 0; display: grid; gap: 8px; }
     const s = String(v == null ? '' : v);
     return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
-  // The whole log, oldest first: one row per entry, keyed by its id.
+  // The whole log, oldest night first: one row per entry, Before sleep then After sleep.
+  // night is the evening the night starts on, so the two halves of a night share it.
+  // date is the log day the entry counts for, which is the next day for After sleep.
   function toCsv(list) {
-    const rows = [['id', 'date', 'slot', 'rating', 'note', 'time']];
-    list.forEach((e) => rows.push([idOf(e.date, e.slot), e.date, e.slot, e.rating, e.note, e.at]));
+    const rows = [['id', 'night', 'date', 'slot', 'rating', 'note', 'time']];
+    byNight(list).forEach((g) => g.items.forEach((e) => {
+      const slot = SLOT_CSV[e.slot];
+      rows.push([g.night + '_' + slot, g.night, e.date, slot, e.rating, e.note, e.at]);
+    }));
     return rows.map((r) => r.map(csvCell).join(',')).join('\n') + '\n';
   }
   function legacyCopy(text) {
@@ -543,15 +568,14 @@ form { margin: 0; display: grid; gap: 8px; }
       e.note && h('p', { class: 'note' }, e.note));
   }
 
-  function daySection(d, today) {
-    const lab = dayLabel(d.date, today);
-    const locked = d.date < today || d.items.some((e) => e.slot === 'night');
+  function nightSection(g, today) {
+    const lab = nightLabel(g.night, today);
     return h('section', { class: 'day' },
       h('h2', null,
         h('span', null, lab[0]),
         lab[1] && h('span', { class: 'dd' }, lab[1]),
-        locked && h('span', { class: 'lock', title: 'Locked' }, lockIcon(), h('span', { class: 'sr' }, 'Locked'))),
-      h('ul', null, ...d.items.map(rowEl)));
+        nightLocked(g, today) && h('span', { class: 'lock', title: 'Locked' }, lockIcon(), h('span', { class: 'sr' }, 'Locked'))),
+      h('ul', null, ...g.items.map(rowEl)));
   }
 
   function renderLog() {
@@ -559,17 +583,17 @@ form { margin: 0; display: grid; gap: 8px; }
     logEl.textContent = '';
     copyEl.disabled = !list.length;
     if (!list.length) {
-      const msg = phase === 'ready' ? 'No entries yet. Pick a number, add a few words, press enter. Morning and night, once each.'
+      const msg = phase === 'ready' ? 'No entries yet. Pick a number, add a few words, press enter. After sleep and before sleep, once each.'
         : phase === 'unavailable' ? 'Your log can’t be shown here.'
         : phase === 'connecting' ? 'Connecting…' : 'Loading your log…';
       logEl.append(h('p', { class: 'quiet' }, msg));
       return;
     }
     const today = dayOf(new Date());
-    const days = byDay(list);
-    const shown = days.slice(-shownDays);
-    if (days.length > shown.length) logEl.append(h('button', { type: 'button', class: 'btn more', id: 'more' }, 'Show earlier days'));
-    shown.forEach((d) => logEl.append(daySection(d, today)));
+    const nights = byNight(list);
+    const shown = nights.slice(-shownNights);
+    if (nights.length > shown.length) logEl.append(h('button', { type: 'button', class: 'btn more', id: 'more' }, 'Show earlier nights'));
+    shown.forEach((g) => logEl.append(nightSection(g, today)));
   }
 
   function scrollToEnd(instant) {
@@ -592,8 +616,11 @@ form { margin: 0; display: grid; gap: 8px; }
     else if (phase === 'unavailable' || !canSave) text = 'Nothing can be saved here.';
     else if (saving) text = 'Saving…';
     else {
-      text = (now.getHours() < ROLLOVER ? 'Counts for ' + shortDay(st.today) + '. ' : '') +
-        'Final once logged.' + (st.slot === 'night' ? ' Night locks the day.' : '');
+      const before = st.slot === 'night';
+      // After midnight and before the day rolls over, say which night the entry will count for.
+      text = (now.getHours() < ROLLOVER ? 'Counts for the night of ' + shortDay(before ? st.today : addDays(st.today, -1)) + '. ' : '') +
+        (before ? '5 = tired and ready. ' : '') +
+        'Final once logged.' + (before ? ' This locks the day.' : '');
     }
     helpEl.textContent = text;
     helpEl.className = 'help' + (kind ? ' ' + kind : '');
@@ -607,12 +634,12 @@ form { margin: 0; display: grid; gap: 8px; }
     form.hidden = locked;
     lockBox.hidden = !locked;
     subEl.textContent = longDay(st.today);
-    if (locked) lockText.textContent = longDay(st.today) + ' is locked. Entries can’t be edited. The next day opens at ' + pad(ROLLOVER) + ':00.';
+    if (locked) lockText.textContent = longDay(st.today) + ' is locked. Entries can’t be edited. After sleep opens at ' + pad(ROLLOVER) + ':00.';
     controls.disabled = !(ready && canSave && !saving && !st.locked);
     sMorning.checked = st.slot === 'morning';
     sNight.checked = st.slot === 'night';
     sMorning.disabled = st.L.morning;
-    if (st.L.morning) sMorning.setAttribute('aria-label', 'Morning, already logged'); else sMorning.removeAttribute('aria-label');
+    if (st.L.morning) sMorning.setAttribute('aria-label', 'After sleep, already logged'); else sMorning.removeAttribute('aria-label');
     okMorning.hidden = !st.L.morning;
     whenEl.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes());
     noteEl.placeholder = PROMPT[st.slot];
@@ -672,7 +699,7 @@ form { margin: 0; display: grid; gap: 8px; }
     saveDraft();
     render();
     scrollToEnd();
-    say(SLOT_LABEL[e.slot] + ' logged, ' + e.rating + ' out of 5.' + (e.slot === 'night' ? ' The day is locked.' : ''));
+    say(SLOT_LABEL[e.slot] + ' logged, ' + e.rating + ' out of 5.' + (e.slot === 'night' ? ' The day is locked.' : ''));   // e.g. "Before sleep logged, 4 out of 5. The day is locked."
     try { if (navigator.vibrate) navigator.vibrate(12); } catch (err) {}
     if (mq('(pointer: coarse)')) noteEl.blur();
   }
@@ -721,7 +748,7 @@ form { margin: 0; display: grid; gap: 8px; }
   $('#csvDone').addEventListener('click', () => { csvWrap.hidden = true; copyEl.focus({ preventScroll: true }); });
   logEl.addEventListener('click', (ev) => {
     if (!ev.target.closest('#more')) return;
-    shownDays += PAGE_DAYS;
+    shownNights += PAGE_NIGHTS;
     renderLog();
     const m = $('#more');
     if (m) m.focus({ preventScroll: true });

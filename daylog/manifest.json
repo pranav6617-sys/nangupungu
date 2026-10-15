@@ -1,6 +1,6 @@
 {
-  "name": "Day Log",
-  "short_name": "Day Log",
+  "name": "Sleep Log",
+  "short_name": "Sleep Log",
   "start_url": "/nangupungu/daylog/",
   "scope": "/nangupungu/daylog/",
   "display": "standalone",
