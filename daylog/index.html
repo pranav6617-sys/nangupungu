@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Day Log</title>
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+</style>
+<style>
+:root {
+  --bg: #ffffff;
+  --text: #37352f;
+  --text-2: #73726e;
+  --text-3: #9b9a97;
+  --line: rgba(55, 53, 47, 0.09);
+  --ring: rgba(55, 53, 47, 0.16);
+  --hover: rgba(55, 53, 47, 0.08);
+  --seg: rgba(55, 53, 47, 0.06);
+  --fill: #f7f6f5;
+  --callout: #f7f6f3;
+  --accent: #2383e2;
+  --accent-ring: rgba(35, 131, 226, 0.35);
+  --danger: #c4443b;
+  --gray-bg: #e3e2e0; --gray-fg: #32302c;
+  --r1-bg: #ffe2dd; --r1-fg: #5d1715; --r1-ring: rgba(93, 23, 21, 0.4);
+  --r2-bg: #fadec9; --r2-fg: #49290e; --r2-ring: rgba(73, 41, 14, 0.4);
+  --r3-bg: #fdecc8; --r3-fg: #402c1b; --r3-ring: rgba(64, 44, 27, 0.4);
+  --r4-bg: #dbeddb; --r4-fg: #1c3829; --r4-ring: rgba(28, 56, 41, 0.4);
+  --r5-bg: #d3e5ef; --r5-fg: #183347; --r5-ring: rgba(24, 51, 71, 0.4);
+  color-scheme: light;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
+  -webkit-font-smoothing: antialiased;
+}
+button, input, textarea { font: inherit; color: inherit; }
+.sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* One centred column. The side gutter sits on each band's inner wrapper. */
+.col {
+  width: 100%;
+  max-width: 640px;
+  margin-inline: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: calc(100dvh - env(safe-area-inset-top, 0px));
+  margin-bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
+}
+
+/* Page title and what the numbers mean */
+.head { padding-block: 40px 0; }
+.titlerow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.titlerow .btn { margin-right: -10px; }
+h1 { margin: 0; font-size: 32px; line-height: 1.2; font-weight: 700; }
+.sub { margin: 2px 0 0; font-size: 14px; line-height: 20px; color: var(--text-2); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
+
+.tag {
+  display: inline-block; padding: 0 6px; border-radius: 3px;
+  font-size: 13px; line-height: 20px; white-space: nowrap;
+}
+.tag.slot { background: var(--gray-bg); color: var(--gray-fg); }
+.r1 { background: var(--r1-bg); color: var(--r1-fg); }
+.r2 { background: var(--r2-bg); color: var(--r2-fg); }
+.r3 { background: var(--r3-bg); color: var(--r3-fg); }
+.r4 { background: var(--r4-bg); color: var(--r4-fg); }
+.r5 { background: var(--r5-bg); color: var(--r5-fg); }
+
+.btn {
+  min-height: 34px; padding: 0 10px; margin: 0;
+  border: 0; border-radius: 4px; background: transparent;
+  font-size: 14px; line-height: 20px; color: var(--text-2);
+  white-space: nowrap; cursor: pointer;
+}
+.btn:disabled { color: var(--text-3); cursor: default; }
+@media (hover: hover) { .btn:not(:disabled):hover { background: var(--hover); } }
+.btn.solid { box-shadow: inset 0 0 0 1px var(--ring); color: var(--text); }
+:is(button, input, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.callout {
+  display: flex; align-items: flex-start; gap: 10px; margin: 0;
+  padding: 12px 14px; border-radius: 4px; background: var(--callout);
+  font-size: 15px; line-height: 1.5;
+}
+.callout > svg { flex: none; margin-top: 3px; color: var(--text-2); }
+.callout p { flex: 1; min-width: 0; margin: 0; }
+.stack { display: grid; gap: 10px; margin-top: 16px; }
+.csvbox { flex: 1; min-width: 0; display: grid; gap: 8px; font-size: 14px; }
+.csvbox p { margin: 0; color: var(--text-2); }
+.csvbox textarea {
+  width: 100%; min-width: 0; padding: 8px; resize: vertical;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: var(--bg); border: 0; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--ring);
+}
+.csvbox .btn { justify-self: start; }
+
+/* The log: oldest day first, newest just above the composer */
+.log { flex: 1; padding-block: 8px 24px; }
+.quiet { margin: 24px 0 0; color: var(--text-2); }
+.more { display: block; margin: 16px 0 0 -10px; }
+.day { margin-top: 28px; }
+.day h2 {
+  display: flex; align-items: center; gap: 8px; margin: 0; padding-bottom: 6px;
+  border-bottom: 1px solid var(--line); font-size: 15px; line-height: 22px; font-weight: 600;
+}
+.day h2 .dd { font-weight: 400; color: var(--text-2); }
+.day h2 .lock { display: inline-flex; margin-left: auto; color: var(--text-3); }
+.day ul { list-style: none; margin: 0; padding: 0; }
+.entry { padding-block: 10px 12px; }
+.entry + .entry { border-top: 1px solid var(--line); }
+.meta { display: flex; align-items: center; gap: 6px; }
+.time { margin-left: auto; font-size: 13px; line-height: 20px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.note { margin: 6px 0 0; overflow-wrap: anywhere; }
+
+/* Composer */
+.dock { position: sticky; bottom: 0; z-index: 5; background: var(--bg); border-top: 1px solid var(--line); }
+.dockin { padding-block: 12px calc(12px + env(safe-area-inset-bottom, 0px)); }
+form { margin: 0; display: grid; gap: 8px; }
+.bare { margin: 0; padding: 0; border: 0; min-width: 0; }
+.rows { display: grid; gap: 10px; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.when { font-size: 14px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+
+.seg { display: inline-flex; gap: 2px; margin: 0; padding: 2px; border: 0; min-width: 0; border-radius: 6px; background: var(--seg); }
+.segopt { position: relative; }
+.segopt input { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.segopt label {
+  display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 4px;
+  font-size: 14px; font-weight: 500; color: var(--text-2);
+}
+.segopt label svg { flex: none; }
+.segopt input:checked + label { background: var(--bg); color: var(--text); box-shadow: 0 0 0 1px var(--ring); }
+.segopt input:disabled { cursor: default; }
+.segopt input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.scale { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.opt { position: relative; }
+.opt input { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.opt label {
+  display: grid; place-items: center; height: 44px; border-radius: 4px;
+  background: var(--bg); box-shadow: inset 0 0 0 1px var(--ring);
+  font-size: 16px; font-weight: 500; color: var(--text-2); font-variant-numeric: tabular-nums;
+}
+@media (hover: hover) { .opt input:not(:disabled):not(:checked):hover + label { background: var(--hover); } }
+.opt input:disabled { cursor: default; }
+.opt input:disabled + label { color: var(--text-3); }
+.opt input:checked + label { background: var(--c-bg); color: var(--c-fg); box-shadow: inset 0 0 0 2px var(--c-ring); }
+.opt input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 2px; }
+.o1 { --c-bg: var(--r1-bg); --c-fg: var(--r1-fg); --c-ring: var(--r1-ring); }
+.o2 { --c-bg: var(--r2-bg); --c-fg: var(--r2-fg); --c-ring: var(--r2-ring); }
+.o3 { --c-bg: var(--r3-bg); --c-fg: var(--r3-fg); --c-ring: var(--r3-ring); }
+.o4 { --c-bg: var(--r4-bg); --c-fg: var(--r4-fg); --c-ring: var(--r4-ring); }
+.o5 { --c-bg: var(--r5-bg); --c-fg: var(--r5-fg); --c-ring: var(--r5-ring); }
+
+.line { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; }
+#note {
+  min-width: 0; height: 44px; margin: 0; padding: 0 12px;
+  font-size: 16px; color: var(--text); background: var(--fill);
+  border: 0; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--ring);
+}
+#note::placeholder { color: var(--text-2); opacity: 0.8; text-overflow: ellipsis; }
+#note:disabled { color: var(--text-3); }
+#note:focus-visible { outline: none; background: var(--bg); box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 2px var(--accent-ring); }
+.send {
+  display: grid; place-items: center; width: 44px; height: 44px; margin: 0; padding: 0;
+  border: 0; border-radius: 4px; background: var(--accent); color: #ffffff; cursor: pointer;
+}
+.send[aria-disabled="true"], .send:disabled { background: var(--hover); color: var(--text-3); cursor: default; }
+.help { min-height: 18px; margin: 0; font-size: 13px; line-height: 18px; color: var(--text-2); }
+.help.error { color: var(--danger); }
+
+@media (max-width: 480px) {
+  .head { padding-block: 28px 0; }
+  h1 { font-size: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="col head">
+    <div class="titlerow">
+      <h1>Day Log</h1>
+      <button type="button" id="copy" class="btn" disabled>Copy CSV</button>
+    </div>
+    <p class="sub" id="sub"></p>
+    <ul class="legend" aria-label="What the numbers mean">
+      <li class="tag r1">1 · rough</li><li class="tag r2">2 · low</li><li class="tag r3">3 · okay</li><li class="tag r4">4 · good</li><li class="tag r5">5 · great</li>
+    </ul>
+  </header>
+
+  <div class="col" id="noticeWrap" hidden>
+    <div class="stack">
+      <div class="callout" role="status">
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 11v5M12 8h.01" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <p id="notice"></p>
+      </div>
+    </div>
+  </div>
+  <div class="col" id="csvWrap" hidden>
+    <div class="stack">
+      <div class="callout">
+        <div class="csvbox">
+          <p>Your browser wouldn’t copy automatically. Select all and copy:</p>
+          <textarea id="csvText" readonly rows="6" spellcheck="false" aria-label="CSV text"></textarea>
+          <button type="button" id="csvDone" class="btn solid">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <main class="col log" id="log" aria-label="Entries">
+    <p class="quiet">Connecting…</p>
+  </main>
+
+  <div class="dock">
+    <div class="col dockin">
+      <form id="composer" autocomplete="off" novalidate>
+        <fieldset class="bare" id="controls">
+          <legend class="sr">New entry</legend>
+          <div class="rows">
+            <div class="top">
+              <fieldset class="seg">
+                <legend class="sr">Time of day</legend>
+                <span class="segopt"><input type="radio" name="slot" id="s-morning" value="morning"><label for="s-morning"><span id="ok" hidden><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Morning</label></span>
+                <span class="segopt"><input type="radio" name="slot" id="s-night" value="night"><label for="s-night">Night</label></span>
+              </fieldset>
+              <span class="when" id="when"></span>
+            </div>
+
+            <fieldset class="scale">
+              <legend class="sr">Rating from 1 to 5</legend>
+              <div class="opt o1"><input type="radio" name="rating" id="r1" value="1" aria-label="1, rough"><label for="r1" title="1 · rough">1</label></div>
+              <div class="opt o2"><input type="radio" name="rating" id="r2" value="2" aria-label="2, low"><label for="r2" title="2 · low">2</label></div>
+              <div class="opt o3"><input type="radio" name="rating" id="r3" value="3" aria-label="3, okay"><label for="r3" title="3 · okay">3</label></div>
+              <div class="opt o4"><input type="radio" name="rating" id="r4" value="4" aria-label="4, good"><label for="r4" title="4 · good">4</label></div>
+              <div class="opt o5"><input type="radio" name="rating" id="r5" value="5" aria-label="5, great"><label for="r5" title="5 · great">5</label></div>
+            </fieldset>
+
+            <div class="line">
+              <input id="note" type="text" maxlength="280" enterkeyhint="send" autocomplete="off" aria-label="A few words">
+              <button type="submit" id="send" class="send" aria-label="Log it" aria-disabled="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M12 19V5M5 12l7-7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </fieldset>
+        <p class="help" id="help"></p>
+      </form>
+
+      <div class="callout" id="lockBox" hidden>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <p id="lockText"></p>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="sr" id="live" role="status" aria-live="polite"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  const SLOTS = ['morning', 'night'];
+  const SLOT_LABEL = { morning: 'Morning', night: 'Night' };
+  const PROMPT = { morning: 'How’s the day starting?', night: 'How did the day go?' };
+  const WORD = ['', 'rough', 'low', 'okay', 'good', 'great'];
+  const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const ROLLOVER = 4;      // a new log day starts at 04:00, so a 00:30 entry still belongs to the evening before
+  const NIGHT_FROM = 17;   // from 17:00 the clock suggests Night
+  const PAGE_DAYS = 5;
+  const MAX_DOCS = 1000;
+  const KEY = 'day-log.v1';
+  const DRAFT_KEY = 'day-log.draft.v1';
+  const NO_CLOUD = 'Can’t reach your log from this view, so nothing will be saved. Try opening the page from your Claude artifacts while signed in.';
+  const NO_LOCAL = 'This browser isn’t letting the page store anything (private browsing, or storage is full), so nothing can be logged here.';
+  const WHY = {
+    locked: 'That day is already locked, so nothing more can be added to it.',
+    exists: 'That one is already logged for this day. Entries are final.',
+    full: 'Storage is full, so that wasn’t saved. Your words are still here.',
+    storage: 'This browser wouldn’t save that. Your words are still here.',
+    denied: 'This view isn’t allowed to save entries.',
+    error: 'Couldn’t save that. Your words are still here. Try again.'
+  };
+
+  const $ = (s) => document.querySelector(s);
+  const pad = (n) => String(n).padStart(2, '0');
+  const mq = (q) => !!(window.matchMedia && window.matchMedia(q).matches);
+
+  const logEl = $('#log'), form = $('#composer'), controls = $('#controls'), noteEl = $('#note'),
+        sendEl = $('#send'), whenEl = $('#when'), helpEl = $('#help'), subEl = $('#sub'), liveEl = $('#live'),
+        copyEl = $('#copy'), noticeWrap = $('#noticeWrap'), noticeEl = $('#notice'),
+        csvWrap = $('#csvWrap'), csvText = $('#csvText'),
+        lockBox = $('#lockBox'), lockText = $('#lockText'),
+        sMorning = $('#s-morning'), sNight = $('#s-night'), okMorning = $('#ok');
+
+  let mode = null;             // 'local' (this browser's storage) or 'cloud' (the artifact database)
+  let phase = 'connecting';    // connecting | loading | ready | unavailable
+  let canSave = true;
+  let saving = false;
+  let col = null;              // the entries collection, in cloud mode
+  let saveEntry = null;        // set once storage is reachable
+  let entries = [];            // what storage holds
+  const fresh = new Map();     // cloud mode: saved from this page, until the database echoes them back
+  let shownDays = PAGE_DAYS;
+  let slotPick = null;         // slot chosen by hand; null follows the clock
+  let shownDay = '';           // the log day the composer was last set up for
+  let help = null;             // { text, kind } shown in the helper line until the next input
+
+  function h(tag, attrs, ...kids) {
+    const el = document.createElement(tag);
+    if (attrs) for (const k in attrs) {
+      const v = attrs[k];
+      if (v === false || v == null) continue;
+      if (k === 'class') el.className = v; else el.setAttribute(k, v === true ? '' : v);
+    }
+    for (const kid of kids) {
+      if (kid == null || kid === false) continue;
+      el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+    }
+    return el;
+  }
+  function lockIcon() {
+    const t = document.createElement('template');
+    t.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+    return t.content.firstChild;
+  }
+
+  let sayTimer;
+  function say(msg) {
+    liveEl.textContent = '';
+    clearTimeout(sayTimer);
+    sayTimer = setTimeout(() => { liveEl.textContent = msg; }, 30);
+  }
+
+  /* ---------- days ---------- */
+
+  const keyOf = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  // The log day a moment belongs to: the calendar day, except before 04:00, which still counts as the day before.
+  const dayOf = (d) => keyOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() - (d.getHours() < ROLLOVER ? 1 : 0)));
+  const parse = (k) => { const p = k.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); };
+  const addDays = (k, n) => { const d = parse(k); return keyOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)); };
+  const longDay = (k) => { const d = parse(k); return WEEKDAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()]; };
+  const shortDay = (k) => { const d = parse(k); return WEEKDAYS[d.getDay()].slice(0, 3) + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()].slice(0, 3); };
+  function dayLabel(k, today) {
+    if (k === today) return ['Today', shortDay(k)];
+    if (k === addDays(today, -1)) return ['Yesterday', shortDay(k)];
+    return [shortDay(k), ''];
+  }
+  // Local time with its offset, so an entry at 08:12 reads the same whatever the clocks do later.
+  function stamp(d) {
+    const off = -d.getTimezoneOffset(), a = Math.abs(off);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' +
+      pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) +
+      (off < 0 ? '-' : '+') + pad(Math.floor(a / 60)) + ':' + pad(a % 60);
+  }
+
+  /* ---------- entries ---------- */
+
+  const idOf = (date, slot) => date + '_' + slot;
+  function isEntry(x) {
+    return !!x && typeof x.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.date) &&
+      SLOTS.indexOf(x.slot) >= 0 && Number.isInteger(x.rating) && x.rating >= 1 && x.rating <= 5 &&
+      typeof x.note === 'string' && typeof x.at === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(x.at);
+  }
+  const clean = (x) => ({ date: x.date, slot: x.slot, rating: x.rating, note: x.note, at: x.at });
+  const order = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) || (a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
+  const cleanNote = (s) => s.replace(/\s+/g, ' ').trim().slice(0, 280);
+
+  function all() {
+    const m = new Map();
+    entries.forEach((e) => m.set(idOf(e.date, e.slot), e));
+    fresh.forEach((e, id) => { if (!m.has(id)) m.set(id, e); });
+    return [...m.values()].sort(order);
+  }
+  const has = (date, slot) => all().some((e) => e.date === date && e.slot === slot);
+  function byDay(list) {
+    const m = new Map();
+    for (const e of list) { if (!m.has(e.date)) m.set(e.date, []); m.get(e.date).push(e); }
+    return [...m.keys()].sort().map((d) => ({ date: d, items: m.get(d) }));
+  }
+
+  // Where the composer stands right now: which day counts, what is logged, which slot is picked.
+  function stateNow(now) {
+    const today = dayOf(now), hr = now.getHours();
+    const L = { morning: has(today, 'morning'), night: has(today, 'night') };
+    const auto = L.morning || hr >= NIGHT_FROM || hr < ROLLOVER ? 'night' : 'morning';
+    const slot = slotPick && !L[slotPick] ? slotPick : auto;
+    return { today, L, slot, locked: L.night };
+  }
+
+  /* ---------- storage: this browser (GitHub Pages) ---------- */
+
+  function readLocal() {
+    let raw = null;
+    try { raw = localStorage.getItem(KEY); } catch (e) { return { ok: false, list: [] }; }
+    if (!raw) return { ok: true, list: [] };
+    try {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        const m = new Map();
+        arr.forEach((x) => {
+          if (!isEntry(x)) return;
+          const c = clean(x), id = idOf(c.date, c.slot);
+          if (!m.has(id) || c.at < m.get(id).at) m.set(id, c);
+        });
+        return { ok: true, list: [...m.values()].sort(order) };
+      }
+    } catch (e) {}
+    // Unreadable: keep the raw text aside instead of letting the next save overwrite it.
+    try { if (!localStorage.getItem(KEY + '.unreadable')) localStorage.setItem(KEY + '.unreadable', raw); } catch (e) {}
+    return { ok: true, list: [] };
+  }
+  const isQuota = (err) => !!err && (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014);
+
+  function saveLocal(e) {
+    const cur = readLocal();                       // newest copy, in case another tab wrote since
+    if (!cur.ok) return { ok: false, why: 'storage' };
+    entries = cur.list;
+    if (has(e.date, 'night')) return { ok: false, why: 'locked' };
+    if (has(e.date, e.slot)) return { ok: false, why: 'exists' };
+    const next = cur.list.concat([e]).sort(order);
+    try { localStorage.setItem(KEY, JSON.stringify(next)); }
+    catch (err) { return { ok: false, why: isQuota(err) ? 'full' : 'storage' }; }
+    entries = next;
+    return { ok: true };
+  }
+
+  /* ---------- storage: the artifact database ---------- */
+
+  // Show what the stored copy says right away, without waiting for the next snapshot.
+  function remember(doc) {
+    const x = doc.data();
+    if (isEntry(x)) fresh.set(idOf(x.date, x.slot), clean(x));
+  }
+
+  async function saveCloud(e) {
+    if (!col) return { ok: false, why: 'error' };
+    const id = idOf(e.date, e.slot);
+    if (has(e.date, 'night')) return { ok: false, why: 'locked' };
+    if (has(e.date, e.slot)) return { ok: false, why: 'exists' };
+    try {
+      // There is no create-if-absent write, so look at the stored copies first.
+      const night = await col.doc(idOf(e.date, 'night')).get();
+      if (night.exists) { remember(night); return { ok: false, why: 'locked' }; }
+      if (e.slot !== 'night') {
+        const same = await col.doc(id).get();
+        if (same.exists) { remember(same); return { ok: false, why: 'exists' }; }
+      }
+      await col.doc(id).set(clean(e));
+    } catch (err) {
+      const code = err && err.code;
+      return { ok: false, why: code === 'quota_exceeded' ? 'full' : code === 'invalid_argument' ? 'denied' : 'error' };
+    }
+    fresh.set(id, e);
+    return { ok: true };
+  }
+
+  /* ---------- CSV ---------- */
+
+  function csvCell(v) {
+    const s = String(v == null ? '' : v);
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  }
+  // The whole log, oldest first: one row per entry, keyed by its id.
+  function toCsv(list) {
+    const rows = [['id', 'date', 'slot', 'rating', 'note', 'time']];
+    list.forEach((e) => rows.push([idOf(e.date, e.slot), e.date, e.slot, e.rating, e.note, e.at]));
+    return rows.map((r) => r.map(csvCell).join(',')).join('\n') + '\n';
+  }
+  function legacyCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { ta.setSelectionRange(0, text.length); } catch (e) {}
+    let ok = false;
+    try { ok = !!document.execCommand && document.execCommand('copy'); } catch (e) {}
+    ta.remove();
+    copyEl.focus({ preventScroll: true });
+    return ok;
+  }
+  let copyTimer;
+  function copied(n) {
+    const capped = mode === 'cloud' && entries.length >= MAX_DOCS;
+    copyEl.textContent = capped ? 'Copied latest ' + n : 'Copied ' + n + (n === 1 ? ' row' : ' rows');
+    say(copyEl.textContent + ' as CSV');
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => { copyEl.textContent = 'Copy CSV'; }, 2400);
+  }
+  function showCsvBox(csv) {
+    csvText.value = csv;
+    csvWrap.hidden = false;
+    csvText.focus();
+    csvText.select();
+  }
+  function copyCsv() {
+    if (mode === 'local') syncLocal();
+    const list = all();
+    if (!list.length) return;
+    const csv = toCsv(list);
+    let p;
+    try { p = Promise.resolve(navigator.clipboard.writeText(csv)); } catch (e) { p = Promise.reject(e); }
+    p.then(() => copied(list.length), () => {
+      if (legacyCopy(csv)) copied(list.length); else showCsvBox(csv);
+    });
+  }
+
+  /* ---------- the log ---------- */
+
+  function rowEl(e) {
+    return h('li', { class: 'entry', 'data-id': idOf(e.date, e.slot) },
+      h('div', { class: 'meta' },
+        h('span', { class: 'tag slot' }, SLOT_LABEL[e.slot]),
+        h('span', { class: 'tag r' + e.rating }, e.rating + ' · ' + WORD[e.rating]),
+        h('time', { class: 'time', datetime: e.at }, e.at.slice(11, 16))),
+      e.note && h('p', { class: 'note' }, e.note));
+  }
+
+  function daySection(d, today) {
+    const lab = dayLabel(d.date, today);
+    const locked = d.date < today || d.items.some((e) => e.slot === 'night');
+    return h('section', { class: 'day' },
+      h('h2', null,
+        h('span', null, lab[0]),
+        lab[1] && h('span', { class: 'dd' }, lab[1]),
+        locked && h('span', { class: 'lock', title: 'Locked' }, lockIcon(), h('span', { class: 'sr' }, 'Locked'))),
+      h('ul', null, ...d.items.map(rowEl)));
+  }
+
+  function renderLog() {
+    const list = all();
+    logEl.textContent = '';
+    copyEl.disabled = !list.length;
+    if (!list.length) {
+      const msg = phase === 'ready' ? 'No entries yet. Pick a number, add a few words, press enter. Morning and night, once each.'
+        : phase === 'unavailable' ? 'Your log can’t be shown here.'
+        : phase === 'connecting' ? 'Connecting…' : 'Loading your log…';
+      logEl.append(h('p', { class: 'quiet' }, msg));
+      return;
+    }
+    const today = dayOf(new Date());
+    const days = byDay(list);
+    const shown = days.slice(-shownDays);
+    if (days.length > shown.length) logEl.append(h('button', { type: 'button', class: 'btn more', id: 'more' }, 'Show earlier days'));
+    shown.forEach((d) => logEl.append(daySection(d, today)));
+  }
+
+  function scrollToEnd(instant) {
+    const top = document.documentElement.scrollHeight;
+    try { window.scrollTo({ top, behavior: instant || mq('(prefers-reduced-motion: reduce)') ? 'auto' : 'smooth' }); }
+    catch (e) { try { window.scrollTo(0, top); } catch (e2) {} }
+  }
+
+  function setNotice(msg) { noticeWrap.hidden = !msg; noticeEl.textContent = msg || ''; }
+
+  /* ---------- the composer ---------- */
+
+  const rating = () => { const r = form.querySelector('input[name="rating"]:checked'); return r ? +r.value : 0; };
+
+  function paintHelp(st, now) {
+    let text, kind = '';
+    if (help) { text = help.text; kind = help.kind; }
+    else if (phase === 'connecting') text = 'Connecting…';
+    else if (phase === 'loading') text = 'Loading your log…';
+    else if (phase === 'unavailable' || !canSave) text = 'Nothing can be saved here.';
+    else if (saving) text = 'Saving…';
+    else {
+      text = (now.getHours() < ROLLOVER ? 'Counts for ' + shortDay(st.today) + '. ' : '') +
+        'Final once logged.' + (st.slot === 'night' ? ' Night locks the day.' : '');
+    }
+    helpEl.textContent = text;
+    helpEl.className = 'help' + (kind ? ' ' + kind : '');
+  }
+
+  function paintComposer() {
+    const now = new Date();
+    const st = stateNow(now);
+    const ready = phase === 'ready';
+    const locked = ready && st.locked;
+    form.hidden = locked;
+    lockBox.hidden = !locked;
+    subEl.textContent = longDay(st.today);
+    if (locked) lockText.textContent = longDay(st.today) + ' is locked. Entries can’t be edited. The next day opens at ' + pad(ROLLOVER) + ':00.';
+    controls.disabled = !(ready && canSave && !saving && !st.locked);
+    sMorning.checked = st.slot === 'morning';
+    sNight.checked = st.slot === 'night';
+    sMorning.disabled = st.L.morning;
+    if (st.L.morning) sMorning.setAttribute('aria-label', 'Morning, already logged'); else sMorning.removeAttribute('aria-label');
+    okMorning.hidden = !st.L.morning;
+    whenEl.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes());
+    noteEl.placeholder = PROMPT[st.slot];
+    sendEl.setAttribute('aria-disabled', rating() && !controls.disabled ? 'false' : 'true');
+    paintHelp(st, now);
+  }
+
+  function render() { renderLog(); paintComposer(); }
+
+  // A new log day starts: forget a slot picked by hand for the day before.
+  function rollDay() {
+    const day = dayOf(new Date());
+    if (day === shownDay) return false;
+    shownDay = day;
+    slotPick = null;
+    return true;
+  }
+  function tick() { if (rollDay()) render(); else paintComposer(); }
+  function schedule() { setTimeout(() => { tick(); schedule(); }, 60000 - (Date.now() % 60000) + 100); }
+
+  let helpTimer;
+  function flag(text) {
+    help = { text, kind: 'error' };
+    paintComposer();
+    say(text);
+    clearTimeout(helpTimer);
+    helpTimer = setTimeout(() => { help = null; paintComposer(); }, 3000);
+  }
+  function clearHelp() {
+    if (!help) return false;
+    help = null;
+    clearTimeout(helpTimer);
+    return true;
+  }
+
+  function saveDraft() {
+    try {
+      const r = rating();
+      if (!noteEl.value && !r) localStorage.removeItem(DRAFT_KEY);
+      else localStorage.setItem(DRAFT_KEY, JSON.stringify({ n: noteEl.value, r }));
+    } catch (e) {}
+  }
+  function loadDraft() {
+    try {
+      const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      if (!d) return;
+      if (typeof d.n === 'string') noteEl.value = d.n.slice(0, 280);
+      if (d.r >= 1 && d.r <= 5) $('#r' + d.r).checked = true;
+    } catch (e) {}
+  }
+
+  function logged(e) {
+    noteEl.value = '';
+    form.querySelectorAll('input[name="rating"]').forEach((x) => { x.checked = false; });
+    slotPick = null;
+    help = null;
+    saveDraft();
+    render();
+    scrollToEnd();
+    say(SLOT_LABEL[e.slot] + ' logged, ' + e.rating + ' out of 5.' + (e.slot === 'night' ? ' The day is locked.' : ''));
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch (err) {}
+    if (mq('(pointer: coarse)')) noteEl.blur();
+  }
+  function notLogged(why) {
+    const text = WHY[why] || WHY.error;
+    help = { text, kind: 'error' };
+    render();
+    say(text);
+    if (!mq('(pointer: coarse)') && !controls.disabled) noteEl.focus({ preventScroll: true });
+  }
+
+  let slowTimer;
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (saving || phase !== 'ready' || !canSave || !saveEntry) return;
+    const now = new Date();
+    const st = stateNow(now);
+    if (st.locked) return;
+    if (st.today !== shownDay) { tick(); flag('A new day just started. Check the slot, then send again.'); return; }
+    const r = rating();
+    if (!r) { flag('Pick a number from 1 to 5 first.'); return; }
+    const e = { date: st.today, slot: st.slot, rating: r, note: cleanNote(noteEl.value), at: stamp(now) };
+    saving = true;
+    clearHelp();
+    paintComposer();
+    slowTimer = setTimeout(() => {
+      if (!saving) return;
+      help = { text: 'Still saving… check your connection.', kind: '' };
+      paintComposer();
+    }, 8000);
+    let res;
+    try { res = await saveEntry(e); } catch (err) { res = { ok: false, why: 'error' }; }
+    clearTimeout(slowTimer);
+    saving = false;
+    if (res.ok) logged(e); else notLogged(res.why);
+  });
+  form.addEventListener('change', (ev) => {
+    if (ev.target && ev.target.name === 'slot') slotPick = ev.target.value;
+    clearHelp();
+    paintComposer();
+    saveDraft();
+  });
+  noteEl.addEventListener('input', () => { if (clearHelp()) paintComposer(); saveDraft(); });
+
+  copyEl.addEventListener('click', copyCsv);
+  $('#csvDone').addEventListener('click', () => { csvWrap.hidden = true; copyEl.focus({ preventScroll: true }); });
+  logEl.addEventListener('click', (ev) => {
+    if (!ev.target.closest('#more')) return;
+    shownDays += PAGE_DAYS;
+    renderLog();
+    const m = $('#more');
+    if (m) m.focus({ preventScroll: true });
+  });
+
+  /* ---------- start ---------- */
+
+  function syncLocal() {
+    const r = readLocal();
+    if (r.ok) entries = r.list;
+  }
+
+  function unavailable(msg) {
+    phase = 'unavailable';
+    col = null;
+    saveEntry = null;
+    setNotice(msg);
+    render();
+  }
+
+  function registerWorker() {
+    if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
+    // When a newer version takes over, reload once so it shows up without any effort.
+    const hadWorker = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadWorker) location.reload(); });
+    const go = () => { navigator.serviceWorker.register('sw.js').catch(() => {}); };
+    if (document.readyState === 'complete') go(); else window.addEventListener('load', go);
+  }
+
+  function bootLocal() {
+    mode = 'local';
+    try { localStorage.setItem(KEY + '.probe', '1'); localStorage.removeItem(KEY + '.probe'); } catch (e) { canSave = false; }
+    const r = readLocal();
+    entries = r.list;
+    if (!r.ok) canSave = false;
+    if (canSave) saveEntry = async (e) => saveLocal(e); else setNotice(NO_LOCAL);
+    // Ask the browser not to clear this data when the phone is short on space.
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}
+    phase = 'ready';
+    render();
+    scrollToEnd(true);
+    window.addEventListener('storage', (ev) => {
+      if (ev.key === KEY || ev.key === null) { syncLocal(); render(); }
+    });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { syncLocal(); rollDay(); render(); } });
+    registerWorker();
+  }
+
+  async function bootCloud(cl) {
+    mode = 'cloud';
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+    let db = null, user = null;
+    try { [db, user] = await Promise.all([cl.use('db'), cl.use('user')]); } catch (e) {}
+    if (!db || !user) return unavailable(NO_CLOUD);
+    let uid = null;
+    try { uid = await user.id(); } catch (e) {}
+    if (!uid) return unavailable(NO_CLOUD);
+    try { col = db.collection('data/users/' + uid + '/log/entries'); } catch (e) { return unavailable(NO_CLOUD); }
+    saveEntry = saveCloud;
+
+    phase = 'loading';
+    render();
+    const slow = setTimeout(() => { if (phase === 'loading') { phase = 'ready'; render(); } }, 6000);
+    let first = true;
+
+    col.orderBy('date', 'desc').limit(MAX_DOCS).onSnapshot((snap) => {
+      const next = [];
+      snap.docs.forEach((d) => {
+        if (d.metadata && d.metadata.hasPendingWrites) return;   // our own save, shown once it is confirmed
+        const x = d.data();
+        if (isEntry(x)) next.push(clean(x));
+      });
+      entries = next;
+      const seen = new Set(next.map((e) => idOf(e.date, e.slot)));
+      fresh.forEach((e, id) => { if (seen.has(id)) fresh.delete(id); });
+      if (phase === 'loading' && (!snap.metadata.fromCache || next.length)) { phase = 'ready'; clearTimeout(slow); }
+      if (phase !== 'ready') return;
+      render();
+      if (first) { first = false; scrollToEnd(true); }
+    }, (err) => {
+      clearTimeout(slow);
+      unavailable(err && err.code === 'revoked'
+        ? 'Access to your log changed. Reload the page to try again.'
+        : 'Lost the connection to your log. Reload the page to try again.');
+    });
+  }
+
+  function boot() {
+    shownDay = dayOf(new Date());
+    loadDraft();
+    render();
+    schedule();
+    const cl = window.claude;
+    if (cl && typeof cl.use === 'function') return bootCloud(cl);
+    bootLocal();
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
