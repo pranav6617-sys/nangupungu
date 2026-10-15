@@ -74,7 +74,8 @@ button, input, textarea { font: inherit; color: inherit; }
 .titlerow .btn { margin-right: -10px; }
 h1 { margin: 0; font-size: 32px; line-height: 1.2; font-weight: 700; }
 .sub { margin: 2px 0 0; font-size: 14px; line-height: 20px; color: var(--text-2); }
-.legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 5px; margin: 12px 0 0; padding: 0; list-style: none; }
+.legend .tag { padding: 0 5px; }
 
 .tag {
   display: inline-block; padding: 0 6px; border-radius: 3px;
@@ -211,8 +212,8 @@ form { margin: 0; display: grid; gap: 8px; }
       <button type="button" id="copy" class="btn" disabled>Copy CSV</button>
     </div>
     <p class="sub" id="sub"></p>
-    <ul class="legend" aria-label="What the numbers mean">
-      <li class="tag r1">1 · awful</li><li class="tag r2">2 · poor</li><li class="tag r3">3 · okay</li><li class="tag r4">4 · good</li><li class="tag r5">5 · great</li>
+    <ul class="legend" id="legend" aria-label="What the numbers mean after sleep">
+      <li class="tag r1">1 · very poor</li><li class="tag r2">2 · poor</li><li class="tag r3">3 · fair</li><li class="tag r4">4 · good</li><li class="tag r5">5 · very good</li>
     </ul>
   </header>
 
@@ -257,11 +258,11 @@ form { margin: 0; display: grid; gap: 8px; }
 
             <fieldset class="scale">
               <legend class="sr">Rating from 1 to 5</legend>
-              <div class="opt o1"><input type="radio" name="rating" id="r1" value="1" aria-label="1, awful"><label for="r1" title="1 · awful">1</label></div>
+              <div class="opt o1"><input type="radio" name="rating" id="r1" value="1" aria-label="1, very poor"><label for="r1" title="1 · very poor">1</label></div>
               <div class="opt o2"><input type="radio" name="rating" id="r2" value="2" aria-label="2, poor"><label for="r2" title="2 · poor">2</label></div>
-              <div class="opt o3"><input type="radio" name="rating" id="r3" value="3" aria-label="3, okay"><label for="r3" title="3 · okay">3</label></div>
+              <div class="opt o3"><input type="radio" name="rating" id="r3" value="3" aria-label="3, fair"><label for="r3" title="3 · fair">3</label></div>
               <div class="opt o4"><input type="radio" name="rating" id="r4" value="4" aria-label="4, good"><label for="r4" title="4 · good">4</label></div>
-              <div class="opt o5"><input type="radio" name="rating" id="r5" value="5" aria-label="5, great"><label for="r5" title="5 · great">5</label></div>
+              <div class="opt o5"><input type="radio" name="rating" id="r5" value="5" aria-label="5, very good"><label for="r5" title="5 · very good">5</label></div>
             </fieldset>
 
             <div class="line">
@@ -295,7 +296,14 @@ form { margin: 0; display: grid; gap: 8px; }
   const SLOT_CSV = { morning: 'after_sleep', night: 'before_sleep' };
   const SLOT_RANK = { night: 0, morning: 1 };   // within one night, Before sleep comes first
   const PROMPT = { morning: 'How did you sleep?', night: 'How are you feeling about sleep?' };
-  const WORD = ['', 'awful', 'poor', 'okay', 'good', 'great'];
+  // Five even steps for each question, with the middle as neither way.
+  // After sleep uses the five answers of the Consensus Sleep Diary's sleep quality question.
+  // Before sleep runs from wired up to tired and ready.
+  const WORDS = {
+    morning: ['', 'very poor', 'poor', 'fair', 'good', 'very good'],
+    night: ['', 'wired', 'restless', 'okay', 'sleepy', 'tired and ready']
+  };
+  const SCALE_HINT = { morning: '', night: '1 = wired, 5 = tired and ready. ' };
   const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const ROLLOVER = 4;      // a new log day starts at 04:00, so a 00:30 entry still belongs to the evening before
@@ -304,6 +312,8 @@ form { margin: 0; display: grid; gap: 8px; }
   const MAX_DOCS = 1000;
   const KEY = 'day-log.v1';
   const DRAFT_KEY = 'day-log.draft.v1';
+  const RESET_KEY = 'day-log.reset';
+  const RESET_TO = 'sleep-log-1';   // change this to clear this browser's log once more
   const NO_CLOUD = 'Can’t reach your log from this view, so nothing will be saved. Try opening the page from your Claude artifacts while signed in.';
   const NO_LOCAL = 'This browser isn’t letting the page store anything (private browsing, or storage is full), so nothing can be logged here.';
   const WHY = {
@@ -324,7 +334,8 @@ form { margin: 0; display: grid; gap: 8px; }
         copyEl = $('#copy'), noticeWrap = $('#noticeWrap'), noticeEl = $('#notice'),
         csvWrap = $('#csvWrap'), csvText = $('#csvText'),
         lockBox = $('#lockBox'), lockText = $('#lockText'),
-        sMorning = $('#s-morning'), sNight = $('#s-night'), okMorning = $('#ok');
+        sMorning = $('#s-morning'), sNight = $('#s-night'), okMorning = $('#ok'),
+        legendEl = $('#legend');
 
   let mode = null;             // 'local' (this browser's storage) or 'cloud' (the artifact database)
   let phase = 'connecting';    // connecting | loading | ready | unavailable
@@ -563,7 +574,7 @@ form { margin: 0; display: grid; gap: 8px; }
     return h('li', { class: 'entry', 'data-id': idOf(e.date, e.slot) },
       h('div', { class: 'meta' },
         h('span', { class: 'tag slot' }, SLOT_LABEL[e.slot]),
-        h('span', { class: 'tag r' + e.rating }, e.rating + ' · ' + WORD[e.rating]),
+        h('span', { class: 'tag r' + e.rating }, e.rating + ' · ' + WORDS[e.slot][e.rating]),
         h('time', { class: 'time', datetime: e.at }, e.at.slice(11, 16))),
       e.note && h('p', { class: 'note' }, e.note));
   }
@@ -619,16 +630,31 @@ form { margin: 0; display: grid; gap: 8px; }
       const before = st.slot === 'night';
       // After midnight and before the day rolls over, say which night the entry will count for.
       text = (now.getHours() < ROLLOVER ? 'Counts for the night of ' + shortDay(before ? st.today : addDays(st.today, -1)) + '. ' : '') +
-        (before ? '5 = tired and ready. ' : '') +
+        SCALE_HINT[st.slot] +
         'Final once logged.' + (before ? ' This locks the day.' : '');
     }
     helpEl.textContent = text;
     helpEl.className = 'help' + (kind ? ' ' + kind : '');
   }
 
+  // The key and the five buttons use the words for whichever question is showing.
+  let scaleSlot = null;
+  function paintScale(slot) {
+    if (scaleSlot === slot) return;
+    scaleSlot = slot;
+    const words = WORDS[slot];
+    legendEl.setAttribute('aria-label', 'What the numbers mean ' + SLOT_LABEL[slot].toLowerCase());
+    legendEl.querySelectorAll('li').forEach((li, i) => { li.textContent = (i + 1) + ' · ' + words[i + 1]; });
+    form.querySelectorAll('input[name="rating"]').forEach((inp, i) => {
+      inp.setAttribute('aria-label', (i + 1) + ', ' + words[i + 1]);
+      inp.nextElementSibling.title = (i + 1) + ' · ' + words[i + 1];
+    });
+  }
+
   function paintComposer() {
     const now = new Date();
     const st = stateNow(now);
+    paintScale(st.slot);
     const ready = phase === 'ready';
     const locked = ready && st.locked;
     form.hidden = locked;
@@ -836,13 +862,27 @@ form { margin: 0; display: grid; gap: 8px; }
     });
   }
 
+  // A fresh start, once per browser: the first time this version opens, the log saved in this browser is cleared.
+  // The marker is written first, so if the browser won't take it nothing is deleted, and it never runs twice.
+  // Only this app's own keys are touched; other apps on the same site keep theirs.
+  function freshStart() {
+    try {
+      if (localStorage.getItem(RESET_KEY) === RESET_TO) return;
+      localStorage.setItem(RESET_KEY, RESET_TO);
+      if (localStorage.getItem(RESET_KEY) !== RESET_TO) return;
+      [KEY, KEY + '.unreadable', DRAFT_KEY].forEach((k) => localStorage.removeItem(k));
+    } catch (e) {}
+  }
+
   function boot() {
+    const cl = window.claude;
+    const cloud = !!(cl && typeof cl.use === 'function');
+    if (!cloud) freshStart();
     shownDay = dayOf(new Date());
     loadDraft();
     render();
     schedule();
-    const cl = window.claude;
-    if (cl && typeof cl.use === 'function') return bootCloud(cl);
+    if (cloud) return bootCloud(cl);
     bootLocal();
   }
 
