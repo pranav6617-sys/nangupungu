@@ -46,7 +46,7 @@ body {
   font: 16px/1.5 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
   -webkit-font-smoothing: antialiased;
 }
-button, input, textarea { font: inherit; color: inherit; }
+button, input, textarea, select { font: inherit; color: inherit; }
 .sr {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
@@ -74,6 +74,8 @@ button, input, textarea { font: inherit; color: inherit; }
 .titlerow .btn { margin-right: -10px; }
 h1 { margin: 0; font-size: 32px; line-height: 1.2; font-weight: 700; }
 .sub { margin: 2px 0 0; font-size: 14px; line-height: 20px; color: var(--text-2); }
+.sync::before { content: "· "; }
+.sync.warn { color: var(--danger); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 5px; margin: 12px 0 0; padding: 0; list-style: none; }
 .legend .tag { padding: 0 5px; }
 
@@ -97,7 +99,7 @@ h1 { margin: 0; font-size: 32px; line-height: 1.2; font-weight: 700; }
 .btn:disabled { color: var(--text-3); cursor: default; }
 @media (hover: hover) { .btn:not(:disabled):hover { background: var(--hover); } }
 .btn.solid { box-shadow: inset 0 0 0 1px var(--ring); color: var(--text); }
-:is(button, input, textarea):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:is(button, input, textarea, select):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .callout {
   display: flex; align-items: flex-start; gap: 10px; margin: 0;
@@ -116,7 +118,7 @@ h1 { margin: 0; font-size: 32px; line-height: 1.2; font-weight: 700; }
 }
 .csvbox .btn { justify-self: start; }
 
-/* The log: oldest day first, newest just above the composer */
+/* The log: oldest night first, newest just above the composer */
 .log { flex: 1; padding-block: 8px 24px; }
 .quiet { margin: 24px 0 0; color: var(--text-2); }
 .more { display: block; margin: 16px 0 0 -10px; }
@@ -126,13 +128,29 @@ h1 { margin: 0; font-size: 32px; line-height: 1.2; font-weight: 700; }
   border-bottom: 1px solid var(--line); font-size: 15px; line-height: 22px; font-weight: 600;
 }
 .day h2 .dd { font-weight: 400; color: var(--text-2); }
-.day h2 .lock { display: inline-flex; margin-left: auto; color: var(--text-3); }
 .day ul { list-style: none; margin: 0; padding: 0; }
-.entry { padding-block: 10px 12px; }
-.entry + .entry { border-top: 1px solid var(--line); }
+.day li + li { border-top: 1px solid var(--line); }
+/* Each entry is a button: tap it to change it. */
+.row {
+  display: block; width: calc(100% + 12px); margin: 0 -6px; padding: 10px 6px 12px;
+  border: 0; border-radius: 4px; background: transparent; text-align: left; cursor: pointer;
+  touch-action: manipulation;
+}
+@media (hover: hover) { .row:hover { background: var(--hover); } }
+.row:active { background: var(--hover); }
 .meta { display: flex; align-items: center; gap: 6px; }
 .time { margin-left: auto; font-size: 13px; line-height: 20px; color: var(--text-2); font-variant-numeric: tabular-nums; }
-.note { margin: 6px 0 0; overflow-wrap: anywhere; }
+.note { display: block; margin: 6px 0 0; overflow-wrap: anywhere; }
+/* A past night with a half missing offers to add it */
+.adds { display: flex; flex-wrap: wrap; gap: 6px; padding-block: 10px; }
+.add {
+  min-height: 32px; padding: 0 10px; margin: 0;
+  border: 0; border-radius: 4px; background: transparent; box-shadow: inset 0 0 0 1px var(--ring);
+  font-size: 14px; line-height: 20px; color: var(--text-2); white-space: nowrap; cursor: pointer;
+  touch-action: manipulation;
+}
+@media (hover: hover) { .add:hover { background: var(--hover); } }
+.add:active { background: var(--hover); }
 
 /* Composer */
 .dock { position: sticky; bottom: 0; z-index: 5; background: var(--bg); border-top: 1px solid var(--line); }
@@ -175,15 +193,15 @@ form { margin: 0; display: grid; gap: 8px; }
 .o5 { --c-bg: var(--r5-bg); --c-fg: var(--r5-fg); --c-ring: var(--r5-ring); }
 
 .line { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; }
-#note {
-  min-width: 0; height: 44px; margin: 0; padding: 0 12px;
+#note, #eNote {
+  width: 100%; min-width: 0; height: 44px; margin: 0; padding: 0 12px;
   font-size: 16px; color: var(--text); background: var(--fill);
   border: 0; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--ring);
   text-overflow: ellipsis;
 }
-#note::placeholder { color: var(--text-2); opacity: 0.8; text-overflow: ellipsis; }
+#note::placeholder, #eNote::placeholder { color: var(--text-2); opacity: 0.8; text-overflow: ellipsis; }
 #note:disabled { color: var(--text-3); }
-#note:focus-visible { outline: none; background: var(--bg); box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 2px var(--accent-ring); }
+#note:focus-visible, #eNote:focus-visible { outline: none; background: var(--bg); box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 2px var(--accent-ring); }
 .send {
   display: grid; place-items: center; width: 44px; height: 44px; margin: 0; padding: 0;
   border: 0; border-radius: 4px; background: var(--accent); color: #ffffff; cursor: pointer;
@@ -191,6 +209,60 @@ form { margin: 0; display: grid; gap: 8px; }
 .send[aria-disabled="true"], .send:disabled { background: var(--hover); color: var(--text-3); cursor: default; }
 .help { min-height: 18px; margin: 0; font-size: 13px; line-height: 18px; color: var(--text-2); }
 .help.error { color: var(--danger); }
+
+/* Changing or adding an entry: a sheet from the bottom */
+.sheet {
+  border: 0; padding: 0; margin: auto auto 0;
+  width: 100%; max-width: 640px; max-height: 100%;
+  border-radius: 12px 12px 0 0;
+  background: var(--bg); color: var(--text);
+  box-shadow: 0 -8px 24px rgba(15, 15, 15, 0.08);
+}
+.sheet::backdrop { background: rgba(15, 15, 15, 0.32); }
+.edit {
+  gap: 14px;
+  padding: 18px max(16px, env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.edit h2 { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; outline: none; }
+.seg.wide { display: grid; grid-template-columns: 1fr 1fr; }
+.seg.wide .segopt label { justify-content: center; height: 36px; }
+.fields { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 8px; }
+.field { display: grid; gap: 4px; min-width: 0; font-size: 13px; line-height: 18px; color: var(--text-2); }
+.field select, .field input {
+  width: 100%; min-width: 0; height: 44px; margin: 0; padding: 0 10px;
+  border: 0; border-radius: 4px; background: var(--fill); box-shadow: inset 0 0 0 1px var(--ring);
+  font-size: 16px; color: var(--text); font-variant-numeric: tabular-nums;
+}
+.field input.bad { box-shadow: inset 0 0 0 1px var(--danger), 0 0 0 1px var(--danger); }
+.nudge { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.nudge button {
+  height: 36px; padding: 0; margin: 0;
+  border: 0; border-radius: 4px; background: var(--bg); box-shadow: inset 0 0 0 1px var(--ring);
+  font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; cursor: pointer;
+  touch-action: manipulation;
+}
+.nudge button:active { background: var(--hover); }
+.actions { display: flex; align-items: center; gap: 4px; padding-top: 2px; }
+.actions .spacer { flex: 1; }
+.btn.danger { color: var(--danger); margin-left: -10px; }
+.btn.primary { min-height: 40px; padding: 0 18px; background: var(--accent); color: #ffffff; font-weight: 500; }
+@media (hover: hover) { .btn.primary:hover { background: #1a73cc; } }
+.btn.quietbtn { min-height: 40px; }
+
+/* Short messages, with Undo after a change */
+.toast {
+  position: fixed; left: 50%; bottom: 16px; z-index: 20; transform: translateX(-50%);
+  width: calc(100% - 32px); max-width: 608px;
+  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 6px 6px 6px 14px;
+  border-radius: 6px; background: var(--text); color: #ffffff; font-size: 14px; line-height: 20px;
+  box-shadow: 0 4px 14px rgba(15, 15, 15, 0.2);
+}
+.toast .msg { flex: 1; min-width: 0; }
+.toast button {
+  min-height: 32px; padding: 0 10px; margin: 0; border: 0; border-radius: 4px; background: transparent;
+  color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.toast button:focus-visible { outline-color: #ffffff; }
 
 @media (max-width: 480px) {
   .head { padding-block: 28px 0; }
@@ -211,7 +283,7 @@ form { margin: 0; display: grid; gap: 8px; }
       <h1>Sleep Log</h1>
       <button type="button" id="copy" class="btn" disabled>Copy CSV</button>
     </div>
-    <p class="sub" id="sub"></p>
+    <p class="sub"><span id="sub"></span> <span class="sync" id="sheet-sync" hidden></span></p>
     <ul class="legend" id="legend" aria-label="What the numbers mean after sleep">
       <li class="tag r1">1 · very poor</li><li class="tag r2">2 · poor</li><li class="tag r3">3 · fair</li><li class="tag r4">4 · good</li><li class="tag r5">5 · very good</li>
     </ul>
@@ -238,10 +310,10 @@ form { margin: 0; display: grid; gap: 8px; }
   </div>
 
   <main class="col log" id="log" aria-label="Entries">
-    <p class="quiet">Connecting…</p>
+    <p class="quiet">Loading…</p>
   </main>
 
-  <div class="dock">
+  <div class="dock" id="dock">
     <div class="col dockin">
       <form id="composer" autocomplete="off" novalidate>
         <fieldset class="bare" id="controls">
@@ -250,8 +322,8 @@ form { margin: 0; display: grid; gap: 8px; }
             <div class="top">
               <fieldset class="seg">
                 <legend class="sr">Before or after sleep</legend>
-                <span class="segopt"><input type="radio" name="slot" id="s-morning" value="morning"><label for="s-morning"><span id="ok" hidden><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>After sleep</label></span>
-                <span class="segopt"><input type="radio" name="slot" id="s-night" value="night"><label for="s-night">Before sleep</label></span>
+                <span class="segopt"><input type="radio" name="slot" id="s-morning" value="morning"><label for="s-morning"><span id="ok-morning" hidden><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>After sleep</label></span>
+                <span class="segopt"><input type="radio" name="slot" id="s-night" value="night"><label for="s-night"><span id="ok-night" hidden><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Before sleep</label></span>
               </fieldset>
               <span class="when" id="when"></span>
             </div>
@@ -276,12 +348,56 @@ form { margin: 0; display: grid; gap: 8px; }
         <p class="help" id="help"></p>
       </form>
 
-      <div class="callout" id="lockBox" hidden>
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        <p id="lockText"></p>
+      <div class="callout" id="doneBox" hidden>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <p id="doneText"></p>
       </div>
     </div>
   </div>
+</div>
+
+<dialog class="sheet" id="sheet" aria-labelledby="sheetTitle">
+  <form class="edit" id="editForm" autocomplete="off" novalidate>
+    <h2 id="sheetTitle" tabindex="-1" autofocus>Edit entry</h2>
+    <fieldset class="seg wide">
+      <legend class="sr">Before or after sleep</legend>
+      <span class="segopt"><input type="radio" name="eslot" id="e-night" value="night"><label for="e-night">Before sleep</label></span>
+      <span class="segopt"><input type="radio" name="eslot" id="e-morning" value="morning"><label for="e-morning">After sleep</label></span>
+    </fieldset>
+    <div class="fields">
+      <label class="field" for="eNight"><span>Night</span><select id="eNight"></select></label>
+      <label class="field" for="eTime"><span>Time, 24h</span><input id="eTime" type="text" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" maxlength="8" placeholder="22:30" aria-describedby="eHelp"></label>
+    </div>
+    <div class="nudge" role="group" aria-label="Shift the time">
+      <button type="button" data-min="-60">−1h</button>
+      <button type="button" data-min="-30">−30m</button>
+      <button type="button" data-min="-15">−15m</button>
+      <button type="button" data-min="15">+15m</button>
+      <button type="button" data-min="30">+30m</button>
+      <button type="button" data-min="60">+1h</button>
+    </div>
+    <fieldset class="scale">
+      <legend class="sr">Rating from 1 to 5</legend>
+      <div class="opt o1"><input type="radio" name="erating" id="e-r1" value="1"><label for="e-r1">1</label></div>
+      <div class="opt o2"><input type="radio" name="erating" id="e-r2" value="2"><label for="e-r2">2</label></div>
+      <div class="opt o3"><input type="radio" name="erating" id="e-r3" value="3"><label for="e-r3">3</label></div>
+      <div class="opt o4"><input type="radio" name="erating" id="e-r4" value="4"><label for="e-r4">4</label></div>
+      <div class="opt o5"><input type="radio" name="erating" id="e-r5" value="5"><label for="e-r5">5</label></div>
+    </fieldset>
+    <input id="eNote" type="text" maxlength="280" enterkeyhint="done" autocomplete="off" aria-label="A few words">
+    <p class="help" id="eHelp"></p>
+    <div class="actions">
+      <button type="button" class="btn danger quietbtn" id="eDelete">Delete</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn quietbtn" id="eCancel">Cancel</button>
+      <button type="submit" class="btn primary" id="eSave">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden>
+  <span class="msg" id="toastMsg"></span>
+  <button type="button" id="toastUndo">Undo</button>
 </div>
 <div class="sr" id="live" role="status" aria-live="polite"></div>
 
@@ -294,6 +410,7 @@ form { margin: 0; display: grid; gap: 8px; }
   // Morning is the After sleep entry, night is the Before sleep entry.
   const SLOT_LABEL = { morning: 'After sleep', night: 'Before sleep' };
   const SLOT_CSV = { morning: 'after_sleep', night: 'before_sleep' };
+  const SLOT_SHEET = { morning: 'sleep_after', night: 'sleep_before' };
   const SLOT_RANK = { night: 0, morning: 1 };   // within one night, Before sleep comes first
   const PROMPT = { morning: 'How did you sleep?', night: 'How are you feeling about sleep?' };
   // Five even steps for each question, with the middle as neither way.
@@ -303,26 +420,22 @@ form { margin: 0; display: grid; gap: 8px; }
     morning: ['', 'very poor', 'poor', 'fair', 'good', 'very good'],
     night: ['', 'wired', 'restless', 'okay', 'sleepy', 'tired and ready']
   };
-  const SCALE_HINT = { morning: '', night: '1 = wired, 5 = tired and ready. ' };
+  const SCALE_HINT = { morning: '', night: '1 = wired, 5 = tired and ready.' };
   const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const ROLLOVER = 4;      // a new log day starts at 04:00, so a 00:30 entry still belongs to the evening before
   const NIGHT_FROM = 20;   // from 20:00 the clock suggests Before sleep
   const PAGE_NIGHTS = 5;
-  const MAX_DOCS = 1000;
+  const MIN = 60000;
   const KEY = 'day-log.v1';
   const DRAFT_KEY = 'day-log.draft.v1';
   const RESET_KEY = 'day-log.reset';
   const RESET_TO = 'sleep-log-1';   // change this to clear this browser's log once more
-  const NO_CLOUD = 'Can’t reach your log from this view, so nothing will be saved. Try opening the page from your Claude artifacts while signed in.';
   const NO_LOCAL = 'This browser isn’t letting the page store anything (private browsing, or storage is full), so nothing can be logged here.';
   const WHY = {
-    locked: 'That day is already locked, so nothing more can be added to it.',
-    exists: 'That one is already logged for this day. Entries are final.',
+    exists: 'That one is already logged. Tap it in the log to change it.',
     full: 'Storage is full, so that wasn’t saved. Your words are still here.',
-    storage: 'This browser wouldn’t save that. Your words are still here.',
-    denied: 'This view isn’t allowed to save entries.',
-    error: 'Couldn’t save that. Your words are still here. Try again.'
+    storage: 'This browser wouldn’t save that. Your words are still here.'
   };
 
   const $ = (s) => document.querySelector(s);
@@ -333,18 +446,12 @@ form { margin: 0; display: grid; gap: 8px; }
         sendEl = $('#send'), whenEl = $('#when'), helpEl = $('#help'), subEl = $('#sub'), liveEl = $('#live'),
         copyEl = $('#copy'), noticeWrap = $('#noticeWrap'), noticeEl = $('#notice'),
         csvWrap = $('#csvWrap'), csvText = $('#csvText'),
-        lockBox = $('#lockBox'), lockText = $('#lockText'),
-        sMorning = $('#s-morning'), sNight = $('#s-night'), okMorning = $('#ok'),
-        legendEl = $('#legend');
+        doneBox = $('#doneBox'), doneText = $('#doneText'), dockEl = $('#dock'),
+        sMorning = $('#s-morning'), sNight = $('#s-night'), okMorning = $('#ok-morning'), okNight = $('#ok-night'),
+        legendEl = $('#legend'), syncEl = $('#sheet-sync');
 
-  let mode = null;             // 'local' (this browser's storage) or 'cloud' (the artifact database)
-  let phase = 'connecting';    // connecting | loading | ready | unavailable
   let canSave = true;
-  let saving = false;
-  let col = null;              // the entries collection, in cloud mode
-  let saveEntry = null;        // set once storage is reachable
-  let entries = [];            // what storage holds
-  const fresh = new Map();     // cloud mode: saved from this page, until the database echoes them back
+  let entries = [];            // what this browser holds, oldest first
   let shownNights = PAGE_NIGHTS;
   let slotPick = null;         // slot chosen by hand; null follows the clock
   let shownDay = '';           // the log day the composer was last set up for
@@ -362,11 +469,6 @@ form { margin: 0; display: grid; gap: 8px; }
       el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
     }
     return el;
-  }
-  function lockIcon() {
-    const t = document.createElement('template');
-    t.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
-    return t.content.firstChild;
   }
 
   let sayTimer;
@@ -401,7 +503,9 @@ form { margin: 0; display: grid; gap: 8px; }
 
   /* ---------- entries ---------- */
 
+  // One Before sleep and one After sleep per night. An entry is known by its log day and slot.
   const idOf = (date, slot) => date + '_' + slot;
+  const idOfEntry = (e) => idOf(e.date, e.slot);
   function isEntry(x) {
     return !!x && typeof x.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.date) &&
       SLOTS.indexOf(x.slot) >= 0 && Number.isInteger(x.rating) && x.rating >= 1 && x.rating <= 5 &&
@@ -410,41 +514,43 @@ form { margin: 0; display: grid; gap: 8px; }
   const clean = (x) => ({ date: x.date, slot: x.slot, rating: x.rating, note: x.note, at: x.at });
   const order = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot) || (a.at < b.at ? -1 : a.at > b.at ? 1 : 0);
   const cleanNote = (s) => s.replace(/\s+/g, ' ').trim().slice(0, 280);
-
-  function all() {
-    const m = new Map();
-    entries.forEach((e) => m.set(idOf(e.date, e.slot), e));
-    fresh.forEach((e, id) => { if (!m.has(id)) m.set(id, e); });
-    return [...m.values()].sort(order);
-  }
-  const has = (date, slot) => all().some((e) => e.date === date && e.slot === slot);
+  const has = (date, slot) => entries.some((e) => e.date === date && e.slot === slot);
 
   // Entries belong to a night: Before sleep on the evening it starts, After sleep on the morning after.
   const nightOf = (e) => (e.slot === 'night' ? e.date : addDays(e.date, -1));
+  // The log day an entry counts for, from its night.
+  const dateFor = (night, slot) => (slot === 'morning' ? addDays(night, 1) : night);
   const byRank = (a, b) => SLOT_RANK[a.slot] - SLOT_RANK[b.slot];
   function byNight(list) {
     const m = new Map();
     for (const e of list) { const n = nightOf(e); if (!m.has(n)) m.set(n, []); m.get(n).push(e); }
     return [...m.keys()].sort().map((n) => ({ night: n, items: m.get(n).sort(byRank) }));
   }
-  // A night is locked once nothing more can be added to it.
-  function nightLocked(g, today) {
-    if (g.items.length === 2) return true;            // both halves are in
-    if (g.night >= today) return false;               // tonight: Before sleep, or the After sleep that follows, is still to come
-    if (g.night === addDays(today, -1)) return has(today, 'morning') || has(today, 'night');   // last night waits for this morning's entry
-    return true;
+  // Every night from the first one logged up to last night, so a night with nothing in it still shows,
+  // plus tonight once it has an entry. Oldest first.
+  function nightList(today) {
+    const groups = byNight(entries);
+    if (!groups.length) return [];
+    const m = new Map(groups.map((g) => [g.night, g.items]));
+    const lastNight = addDays(today, -1);
+    const end = groups[groups.length - 1].night > lastNight ? groups[groups.length - 1].night : lastNight;
+    const out = [];
+    for (let n = groups[0].night; n <= end && out.length < 5000; n = addDays(n, 1)) out.push({ night: n, items: m.get(n) || [] });
+    return out;
   }
 
-  // Where the composer stands right now: which day counts, what is logged, which slot is picked.
+  // Where the composer stands right now: which day counts, what is logged, which slot is up.
+  // Once the slot the clock suggests is in, the composer rests until the day rolls over;
+  // anything missed is added from the log instead.
   function stateNow(now) {
     const today = dayOf(now), hr = now.getHours();
     const L = { morning: has(today, 'morning'), night: has(today, 'night') };
     const auto = L.morning || hr >= NIGHT_FROM || hr < ROLLOVER ? 'night' : 'morning';
     const slot = slotPick && !L[slotPick] ? slotPick : auto;
-    return { today, L, slot, locked: L.night };
+    return { today, L, slot, done: L[slot] };
   }
 
-  /* ---------- storage: this browser (GitHub Pages) ---------- */
+  /* ---------- storage: this browser ---------- */
 
   function readLocal() {
     let raw = null;
@@ -467,48 +573,35 @@ form { margin: 0; display: grid; gap: 8px; }
     return { ok: true, list: [] };
   }
   const isQuota = (err) => !!err && (err.name === 'QuotaExceededError' || err.code === 22 || err.code === 1014);
-
-  function saveLocal(e) {
-    const cur = readLocal();                       // newest copy, in case another tab wrote since
-    if (!cur.ok) return { ok: false, why: 'storage' };
-    entries = cur.list;
-    if (has(e.date, 'night')) return { ok: false, why: 'locked' };
-    if (has(e.date, e.slot)) return { ok: false, why: 'exists' };
-    const next = cur.list.concat([e]).sort(order);
-    try { localStorage.setItem(KEY, JSON.stringify(next)); }
-    catch (err) { return { ok: false, why: isQuota(err) ? 'full' : 'storage' }; }
-    entries = next;
-    return { ok: true };
+  function syncLocal() {
+    const r = readLocal();
+    if (r.ok) entries = r.list;
+    return r.ok;
   }
 
-  /* ---------- storage: the artifact database ---------- */
-
-  // Show what the stored copy says right away, without waiting for the next snapshot.
-  function remember(doc) {
-    const x = doc.data();
-    if (isEntry(x)) fresh.set(idOf(x.date, x.slot), clean(x));
+  // Each change starts from the newest copy, in case another tab wrote since, and saves the whole list.
+  // They give '' once saved, otherwise the reason it wasn't.
+  function writeLocal(list) {
+    try { localStorage.setItem(KEY, JSON.stringify(list)); }
+    catch (err) { return isQuota(err) ? 'full' : 'storage'; }
+    entries = list;
+    changed();
+    return '';
   }
-
-  async function saveCloud(e) {
-    if (!col) return { ok: false, why: 'error' };
-    const id = idOf(e.date, e.slot);
-    if (has(e.date, 'night')) return { ok: false, why: 'locked' };
-    if (has(e.date, e.slot)) return { ok: false, why: 'exists' };
-    try {
-      // There is no create-if-absent write, so look at the stored copies first.
-      const night = await col.doc(idOf(e.date, 'night')).get();
-      if (night.exists) { remember(night); return { ok: false, why: 'locked' }; }
-      if (e.slot !== 'night') {
-        const same = await col.doc(id).get();
-        if (same.exists) { remember(same); return { ok: false, why: 'exists' }; }
-      }
-      await col.doc(id).set(clean(e));
-    } catch (err) {
-      const code = err && err.code;
-      return { ok: false, why: code === 'quota_exceeded' ? 'full' : code === 'invalid_argument' ? 'denied' : 'error' };
-    }
-    fresh.set(id, e);
-    return { ok: true };
+  function addNew(e) {
+    if (!syncLocal()) return 'storage';
+    if (has(e.date, e.slot)) return 'exists';
+    return writeLocal(entries.concat([e]).sort(order));
+  }
+  // Puts e where the entry oldId was (oldId null adds it). Refuses if another entry already holds e's place.
+  function replace(oldId, e) {
+    if (!syncLocal()) return 'storage';
+    if (idOfEntry(e) !== oldId && has(e.date, e.slot)) return 'taken';
+    return writeLocal(entries.filter((x) => idOfEntry(x) !== oldId).concat([e]).sort(order));
+  }
+  function remove(id) {
+    if (!syncLocal()) return 'storage';
+    return writeLocal(entries.filter((x) => idOfEntry(x) !== id));
   }
 
   /* ---------- CSV ---------- */
@@ -544,8 +637,7 @@ form { margin: 0; display: grid; gap: 8px; }
   }
   let copyTimer;
   function copied(n) {
-    const capped = mode === 'cloud' && entries.length >= MAX_DOCS;
-    copyEl.textContent = capped ? 'Copied latest ' + n : 'Copied ' + n + (n === 1 ? ' row' : ' rows');
+    copyEl.textContent = 'Copied ' + n + (n === 1 ? ' row' : ' rows');
     say(copyEl.textContent + ' as CSV');
     clearTimeout(copyTimer);
     copyTimer = setTimeout(() => { copyEl.textContent = 'Copy CSV'; }, 2400);
@@ -557,8 +649,8 @@ form { margin: 0; display: grid; gap: 8px; }
     csvText.select();
   }
   function copyCsv() {
-    if (mode === 'local') syncLocal();
-    const list = all();
+    syncLocal();
+    const list = entries;
     if (!list.length) return;
     const csv = toCsv(list);
     let p;
@@ -571,37 +663,54 @@ form { margin: 0; display: grid; gap: 8px; }
   /* ---------- the log ---------- */
 
   function rowEl(e) {
-    return h('li', { class: 'entry', 'data-id': idOf(e.date, e.slot) },
-      h('div', { class: 'meta' },
-        h('span', { class: 'tag slot' }, SLOT_LABEL[e.slot]),
-        h('span', { class: 'tag r' + e.rating }, e.rating + ' · ' + WORDS[e.slot][e.rating]),
-        h('time', { class: 'time', datetime: e.at }, e.at.slice(11, 16))),
-      e.note && h('p', { class: 'note' }, e.note));
+    return h('li', null,
+      h('button', { type: 'button', class: 'row', 'data-id': idOfEntry(e) },
+        h('span', { class: 'meta' },
+          h('span', { class: 'tag slot' }, SLOT_LABEL[e.slot]),
+          h('span', { class: 'tag r' + e.rating }, e.rating + ' · ' + WORDS[e.slot][e.rating]),
+          h('time', { class: 'time', datetime: e.at }, e.at.slice(11, 16))),
+        e.note && h('span', { class: 'note' }, e.note),
+        h('span', { class: 'sr' }, '. Edit')));
+  }
+  function addsEl(night, slots) {
+    return h('li', { class: 'adds' }, ...slots.map((slot) =>
+      h('button', { type: 'button', class: 'add', 'data-night': night, 'data-slot': slot,
+        'aria-label': 'Add ' + SLOT_LABEL[slot].toLowerCase() + ' for the night of ' + shortDay(night) },
+      '+ ' + SLOT_LABEL[slot].toLowerCase())));
   }
 
+  // Past nights offer to add whichever half is missing, where it would sit.
   function nightSection(g, today) {
     const lab = nightLabel(g.night, today);
+    const past = g.night < today;
+    const kids = [];
+    let missing = [];
+    for (const slot of ['night', 'morning']) {
+      const e = g.items.find((x) => x.slot === slot);
+      if (e) {
+        if (missing.length) { kids.push(addsEl(g.night, missing)); missing = []; }
+        kids.push(rowEl(e));
+      } else if (past) {
+        missing.push(slot);
+      }
+    }
+    if (missing.length) kids.push(addsEl(g.night, missing));
     return h('section', { class: 'day' },
-      h('h2', null,
-        h('span', null, lab[0]),
-        lab[1] && h('span', { class: 'dd' }, lab[1]),
-        nightLocked(g, today) && h('span', { class: 'lock', title: 'Locked' }, lockIcon(), h('span', { class: 'sr' }, 'Locked'))),
-      h('ul', null, ...g.items.map(rowEl)));
+      h('h2', null, h('span', null, lab[0]), lab[1] && h('span', { class: 'dd' }, lab[1])),
+      h('ul', null, ...kids));
   }
 
   function renderLog() {
-    const list = all();
     logEl.textContent = '';
-    copyEl.disabled = !list.length;
-    if (!list.length) {
-      const msg = phase === 'ready' ? 'No entries yet. Pick a number, add a few words, press enter. After sleep and before sleep, once each.'
-        : phase === 'unavailable' ? 'Your log can’t be shown here.'
-        : phase === 'connecting' ? 'Connecting…' : 'Loading your log…';
-      logEl.append(h('p', { class: 'quiet' }, msg));
+    copyEl.disabled = !entries.length;
+    if (!entries.length) {
+      logEl.append(h('p', { class: 'quiet' }, canSave
+        ? 'No entries yet. Pick a number, add a few words, press enter: after sleep in the morning, before sleep at night.'
+        : 'Your log can’t be shown here.'));
       return;
     }
     const today = dayOf(new Date());
-    const nights = byNight(list);
+    const nights = nightList(today);
     const shown = nights.slice(-shownNights);
     if (nights.length > shown.length) logEl.append(h('button', { type: 'button', class: 'btn more', id: 'more' }, 'Show earlier nights'));
     shown.forEach((g) => logEl.append(nightSection(g, today)));
@@ -615,6 +724,33 @@ form { margin: 0; display: grid; gap: 8px; }
 
   function setNotice(msg) { noticeWrap.hidden = !msg; noticeEl.textContent = msg || ''; }
 
+  /* ---------- toast ---------- */
+
+  const toastEl = $('#toast'), toastMsg = $('#toastMsg'), toastUndo = $('#toastUndo');
+  let toastTimer = 0, undoFn = null;
+  function toast(msg, undo, ms) {
+    toastMsg.textContent = msg;
+    undoFn = undo || null;
+    toastUndo.hidden = !undoFn;
+    toastEl.style.bottom = (dockEl.offsetHeight + 8) + 'px';   // just above the composer
+    toastEl.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, ms || (undoFn ? 6000 : 3000));
+  }
+  function hideToast() {
+    clearTimeout(toastTimer);
+    toastEl.hidden = true;
+    undoFn = null;
+  }
+  toastUndo.addEventListener('click', () => {
+    const f = undoFn;
+    hideToast();
+    if (!f) return;
+    const why = f();
+    render();
+    toast(why ? 'Couldn’t undo: ' + (why === 'taken' ? 'another entry is in its place now.' : WHY[why] || WHY.storage) : 'Undone', null, why ? 5000 : 1600);
+  });
+
   /* ---------- the composer ---------- */
 
   const rating = () => { const r = form.querySelector('input[name="rating"]:checked'); return r ? +r.value : 0; };
@@ -622,16 +758,12 @@ form { margin: 0; display: grid; gap: 8px; }
   function paintHelp(st, now) {
     let text, kind = '';
     if (help) { text = help.text; kind = help.kind; }
-    else if (phase === 'connecting') text = 'Connecting…';
-    else if (phase === 'loading') text = 'Loading your log…';
-    else if (phase === 'unavailable' || !canSave) text = 'Nothing can be saved here.';
-    else if (saving) text = 'Saving…';
+    else if (!canSave) text = 'Nothing can be saved here.';
     else {
       const before = st.slot === 'night';
       // After midnight and before the day rolls over, say which night the entry will count for.
-      text = (now.getHours() < ROLLOVER ? 'Counts for the night of ' + shortDay(before ? st.today : addDays(st.today, -1)) + '. ' : '') +
-        SCALE_HINT[st.slot] +
-        'Final once logged.' + (before ? ' This locks the day.' : '');
+      text = ((now.getHours() < ROLLOVER ? 'Counts for the night of ' + shortDay(before ? st.today : addDays(st.today, -1)) + '. ' : '') +
+        SCALE_HINT[st.slot]).trim() || 'Tap any entry to change it.';
     }
     helpEl.textContent = text;
     helpEl.className = 'help' + (kind ? ' ' + kind : '');
@@ -655,18 +787,20 @@ form { margin: 0; display: grid; gap: 8px; }
     const now = new Date();
     const st = stateNow(now);
     paintScale(st.slot);
-    const ready = phase === 'ready';
-    const locked = ready && st.locked;
-    form.hidden = locked;
-    lockBox.hidden = !locked;
+    form.hidden = st.done;
+    doneBox.hidden = !st.done;
     subEl.textContent = longDay(st.today);
-    if (locked) lockText.textContent = longDay(st.today) + ' is locked. Entries can’t be edited. After sleep opens at ' + pad(ROLLOVER) + ':00.';
-    controls.disabled = !(ready && canSave && !saving && !st.locked);
+    if (st.done) doneText.textContent = SLOT_LABEL[st.slot] + ' is in. To change an entry, tap it above.' +
+      (st.slot === 'night' ? ' After sleep is next, from ' + pad(ROLLOVER) + ':00.' : '');
+    controls.disabled = !(canSave && !st.done);
     sMorning.checked = st.slot === 'morning';
     sNight.checked = st.slot === 'night';
     sMorning.disabled = st.L.morning;
+    sNight.disabled = st.L.night;
     if (st.L.morning) sMorning.setAttribute('aria-label', 'After sleep, already logged'); else sMorning.removeAttribute('aria-label');
+    if (st.L.night) sNight.setAttribute('aria-label', 'Before sleep, already logged'); else sNight.removeAttribute('aria-label');
     okMorning.hidden = !st.L.morning;
+    okNight.hidden = !st.L.night;
     whenEl.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes());
     noteEl.placeholder = PROMPT[st.slot];
     sendEl.setAttribute('aria-disabled', rating() && !controls.disabled ? 'false' : 'true');
@@ -725,42 +859,30 @@ form { margin: 0; display: grid; gap: 8px; }
     saveDraft();
     render();
     scrollToEnd();
-    say(SLOT_LABEL[e.slot] + ' logged, ' + e.rating + ' out of 5.' + (e.slot === 'night' ? ' The day is locked.' : ''));   // e.g. "Before sleep logged, 4 out of 5. The day is locked."
+    say(SLOT_LABEL[e.slot] + ' logged, ' + e.rating + ' out of 5.');   // e.g. "Before sleep logged, 4 out of 5."
     try { if (navigator.vibrate) navigator.vibrate(12); } catch (err) {}
     if (mq('(pointer: coarse)')) noteEl.blur();
   }
   function notLogged(why) {
-    const text = WHY[why] || WHY.error;
+    const text = WHY[why] || WHY.storage;
     help = { text, kind: 'error' };
     render();
     say(text);
     if (!mq('(pointer: coarse)') && !controls.disabled) noteEl.focus({ preventScroll: true });
   }
 
-  let slowTimer;
-  form.addEventListener('submit', async (ev) => {
+  form.addEventListener('submit', (ev) => {
     ev.preventDefault();
-    if (saving || phase !== 'ready' || !canSave || !saveEntry) return;
+    if (!canSave) return;
     const now = new Date();
     const st = stateNow(now);
-    if (st.locked) return;
+    if (st.done) return;
     if (st.today !== shownDay) { tick(); flag('A new day just started. Check the slot, then send again.'); return; }
     const r = rating();
     if (!r) { flag('Pick a number from 1 to 5 first.'); return; }
     const e = { date: st.today, slot: st.slot, rating: r, note: cleanNote(noteEl.value), at: stamp(now) };
-    saving = true;
-    clearHelp();
-    paintComposer();
-    slowTimer = setTimeout(() => {
-      if (!saving) return;
-      help = { text: 'Still saving… check your connection.', kind: '' };
-      paintComposer();
-    }, 8000);
-    let res;
-    try { res = await saveEntry(e); } catch (err) { res = { ok: false, why: 'error' }; }
-    clearTimeout(slowTimer);
-    saving = false;
-    if (res.ok) logged(e); else notLogged(res.why);
+    const why = addNew(e);
+    if (why) notLogged(why); else logged(e);
   });
   form.addEventListener('change', (ev) => {
     if (ev.target && ev.target.name === 'slot') slotPick = ev.target.value;
@@ -772,97 +894,334 @@ form { margin: 0; display: grid; gap: 8px; }
 
   copyEl.addEventListener('click', copyCsv);
   $('#csvDone').addEventListener('click', () => { csvWrap.hidden = true; copyEl.focus({ preventScroll: true }); });
+
+  /* ---------- changing an entry ---------- */
+
+  const sheet = $('#sheet'), editForm = $('#editForm'), sheetTitle = $('#sheetTitle'),
+        eNightSel = $('#eNight'), eTime = $('#eTime'), eNote = $('#eNote'), eHelp = $('#eHelp'), eDelete = $('#eDelete');
+  let editing = null;        // { id, entry } when changing one, { id: null, night, slot } when adding one
+  let needsReload = false;   // a newer version arrived while the sheet was open
+
+  // Reads a typed time: 2230, 22:30, 7:40, 740, 7.40, 7, and a trailing am/pm. Gives { h, m } or null.
+  function parseTime(text) {
+    let s = String(text || '').trim().toLowerCase();
+    let ap = '';
+    const suffix = s.match(/\s*([ap])\.?\s*m?\.?$/);
+    if (suffix) { ap = suffix[1]; s = s.slice(0, suffix.index).trim(); }
+    s = s.replace(/\s*:\s*/g, ':').replace(/[.\s]+/g, ':');
+    let hr, mi;
+    if (s.includes(':')) {
+      const parts = s.split(':');
+      if (parts.length !== 2 || !/^\d{1,2}$/.test(parts[0]) || !/^\d{1,2}$/.test(parts[1])) return null;
+      hr = +parts[0]; mi = +parts[1];
+    } else {
+      if (!/^\d{1,4}$/.test(s)) return null;
+      if (s.length <= 2) { hr = +s; mi = 0; } else { hr = +s.slice(0, -2); mi = +s.slice(-2); }
+    }
+    if (ap) {
+      if (hr < 1 || hr > 12) return null;
+      if (ap === 'p' && hr < 12) hr += 12;
+      if (ap === 'a' && hr === 12) hr = 0;
+    }
+    if (hr > 23 || mi > 59) return null;
+    return { h: hr, m: mi };
+  }
+  const hhmm = (t) => pad(t.h) + ':' + pad(t.m);
+
+  // The moment a time on a night stands for. Before sleep is that evening, or after midnight
+  // (before 04:00) the next day; After sleep is the morning after.
+  function momentFor(night, slot, t) {
+    const p = night.split('-').map(Number);
+    const next = slot === 'morning' || t.h < ROLLOVER;
+    return new Date(p[0], p[1] - 1, p[2] + (next ? 1 : 0), t.h, t.m);
+  }
+
+  // Tonight and the 30 nights before it, plus whichever night the entry is on.
+  function fillNights(selected) {
+    const today = dayOf(new Date());
+    const set = new Set([selected]);
+    for (let i = 0; i <= 30; i++) set.add(addDays(today, -i));
+    eNightSel.replaceChildren(...[...set].sort().reverse().map((n) => {
+      const lab = nightLabel(n, today);
+      return h('option', { value: n }, lab[1] ? lab[0] + ' · ' + lab[1] : shortDay(n));
+    }));
+    eNightSel.value = selected;
+  }
+  const eSlot = () => { const r = editForm.querySelector('input[name="eslot"]:checked'); return r ? r.value : 'night'; };
+  const eRating = () => { const r = editForm.querySelector('input[name="erating"]:checked'); return r ? +r.value : 0; };
+  const flagInput = (input, bad) => {
+    input.classList.toggle('bad', bad);
+    if (bad) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
+  };
+
+  // The line under the note: when the entry falls and what its number means, or what went wrong.
+  function paintSheet(error) {
+    const slot = eSlot(), words = WORDS[slot];
+    editForm.querySelectorAll('input[name="erating"]').forEach((inp, i) => {
+      inp.setAttribute('aria-label', (i + 1) + ', ' + words[i + 1]);
+      inp.nextElementSibling.title = (i + 1) + ' · ' + words[i + 1];
+    });
+    eNote.placeholder = PROMPT[slot];
+    eTime.placeholder = slot === 'night' ? '22:30' : '07:00';
+    let text = error || '';
+    if (!text) {
+      const t = parseTime(eTime.value), r = eRating(), parts = [];
+      if (t && eNightSel.value) {
+        const d = momentFor(eNightSel.value, slot, t);
+        parts.push(shortDay(keyOf(d)) + ' at ' + hhmm(t));
+      }
+      parts.push(r ? r + ' · ' + words[r] : '1 = ' + words[1] + ', 5 = ' + words[5]);
+      text = parts.join(' · ');
+    }
+    eHelp.textContent = text;
+    eHelp.className = 'help' + (error ? ' error' : '');
+    if (error) say(error);
+  }
+
+  function openSheet(state) {
+    const e = state.entry;
+    editing = state;
+    const night = e ? nightOf(e) : state.night, slot = e ? e.slot : state.slot;
+    sheetTitle.textContent = e ? 'Edit entry' : 'Add ' + SLOT_LABEL[slot].toLowerCase();
+    $('#e-' + slot).checked = true;
+    fillNights(night);
+    eTime.value = e ? e.at.slice(11, 16) : '';
+    flagInput(eTime, false);
+    editForm.querySelectorAll('input[name="erating"]').forEach((x) => { x.checked = !!e && +x.value === e.rating; });
+    eNote.value = e ? e.note : '';
+    eDelete.hidden = !e;
+    paintSheet();
+    if (!sheet.open) sheet.showModal();
+  }
+  function closeSheet() { if (sheet.open) sheet.close(); }
+
   logEl.addEventListener('click', (ev) => {
-    if (!ev.target.closest('#more')) return;
-    shownNights += PAGE_NIGHTS;
-    renderLog();
-    const m = $('#more');
-    if (m) m.focus({ preventScroll: true });
+    if (ev.target.closest('#more')) {
+      shownNights += PAGE_NIGHTS;
+      renderLog();
+      const m = $('#more');
+      if (m) m.focus({ preventScroll: true });
+      return;
+    }
+    const row = ev.target.closest('.row');
+    if (row) {
+      syncLocal();
+      const e = entries.find((x) => idOfEntry(x) === row.dataset.id);
+      if (e) openSheet({ id: row.dataset.id, entry: e }); else render();
+      return;
+    }
+    const add = ev.target.closest('.add');
+    if (add) openSheet({ id: null, night: add.dataset.night, slot: add.dataset.slot });
   });
+
+  sheet.addEventListener('click', (ev) => { if (ev.target === sheet) closeSheet(); });   // a tap outside the sheet
+  sheet.addEventListener('close', () => { editing = null; if (needsReload) location.reload(); });
+  $('#eCancel').addEventListener('click', closeSheet);
+  editForm.addEventListener('change', () => paintSheet());
+
+  // Tapping the time selects it all, so typing replaces it. (Phones place the cursor after the tap, so select again on finger-up.)
+  let typed = false;
+  const selectTime = () => { if (!typed) { try { eTime.select(); } catch (e) {} } };
+  eTime.addEventListener('focus', () => { typed = false; setTimeout(selectTime, 0); });
+  eTime.addEventListener('pointerup', () => setTimeout(selectTime, 0));
+  eTime.addEventListener('input', () => { typed = true; flagInput(eTime, false); paintSheet(); });
+  eTime.addEventListener('blur', () => {
+    const t = parseTime(eTime.value);
+    if (t) eTime.value = hhmm(t);
+    paintSheet();
+  });
+  eNote.addEventListener('input', () => { if (eHelp.classList.contains('error')) paintSheet(); });
+
+  // Shifting the time keeps the night; going past midnight moves Before sleep into the small hours.
+  for (const b of editForm.querySelectorAll('.nudge button')) {
+    b.addEventListener('click', () => {
+      const t = parseTime(eTime.value) || parseTime(eTime.placeholder);
+      let m = (t.h * 60 + t.m + Number(b.dataset.min)) % 1440;
+      if (m < 0) m += 1440;
+      eTime.value = hhmm({ h: Math.floor(m / 60), m: m % 60 });
+      flagInput(eTime, false);
+      paintSheet();
+    });
+  }
+
+  editForm.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const st = editing;
+    if (!st) { closeSheet(); return; }
+    const slot = eSlot(), night = eNightSel.value, t = parseTime(eTime.value), r = eRating();
+    flagInput(eTime, !t);
+    if (!t) {
+      paintSheet(eTime.value.trim() ? 'Couldn’t read that time. Try 2230 or 22:30.' : 'Add roughly when, like 2230 or 0710.');
+      eTime.focus();
+      return;
+    }
+    if (!r) { paintSheet('Pick a number from 1 to 5.'); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(night)) return;
+    const old = st.entry;
+    const same = !!old && nightOf(old) === night && old.slot === slot && old.at.slice(11, 16) === hhmm(t);
+    const when = momentFor(night, slot, t);
+    if (!same && when.getTime() > Date.now() + 2 * 60 * MIN) {
+      paintSheet('That’s still to come. Check the night.');
+      return;
+    }
+    const e = { date: dateFor(night, slot), slot, rating: r, note: cleanNote(eNote.value), at: same ? old.at : stamp(when) };
+    if (old && e.date === old.date && e.slot === old.slot && e.rating === old.rating && e.note === old.note && e.at === old.at) {
+      closeSheet();
+      return;
+    }
+    const why = replace(st.id, e);
+    if (why === 'taken') {
+      const lab = nightLabel(night, dayOf(new Date()));
+      paintSheet((lab[1] ? lab[0] : 'The ' + lab[0].charAt(0).toLowerCase() + lab[0].slice(1)) + ' already has ' +
+        (slot === 'night' ? 'a before sleep' : 'an after sleep') + ' entry. Change that one instead.');
+      return;
+    }
+    if (why) { paintSheet(WHY[why] || WHY.storage); return; }
+    closeSheet();
+    render();
+    const now = idOfEntry(e);
+    toast(old ? 'Entry updated' : SLOT_LABEL[slot] + ' added', old ? () => replace(now, old) : () => remove(now));
+  });
+
+  eDelete.addEventListener('click', () => {
+    const st = editing;
+    if (!st || !st.entry) return;
+    const why = remove(st.id);
+    if (why) { paintSheet(WHY[why] || WHY.storage); return; }
+    closeSheet();
+    render();
+    toast('Entry deleted', () => replace(null, st.entry));
+  });
+
+  // ---------- sending the log to the Tracking log sheet ----------
+  // Off until the setup link (…/#log=<web app address>&key=<key>) has been opened in any tracker on this site.
+  // Every change sends the whole log, so edits and deletes reach the sheet too. A send that
+  // fails (no signal) is repeated when the app is next opened or comes back online.
+  const LINK = 'tracking-log.link.v1';   // one setting for every tracker on this site
+  const UNSENT = KEY + '.unsent';
+  const SENT_ONCE = KEY + '.sent-once';  // until the first send, the whole existing log still needs to go
+  const SOURCE = 'sleep_app';
+  const okUrl = (u) => /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u) ||
+    /^http:\/\/(localhost|127\.0\.0\.1):\d+\/[\w/-]*$/.test(u);
+
+  function link() {
+    try {
+      const v = JSON.parse(localStorage.getItem(LINK) || 'null');
+      if (v && typeof v.url === 'string' && okUrl(v.url) && typeof v.key === 'string' && v.key) return v;
+    } catch (_) {}
+    return null;
+  }
+  const unsent = () => { try { return localStorage.getItem(UNSENT) === '1'; } catch (_) { return false; } };
+  const setUnsent = (on) => { try { if (on) localStorage.setItem(UNSENT, '1'); else localStorage.removeItem(UNSENT); } catch (_) {} };
+
+  const SHEET_LABELS = { sent: 'synced', sending: 'syncing…', waiting: 'not synced yet', paused: 'sync paused', error: 'sync error' };
+  let sheetState = '';
+  function setSheet(state, note) {
+    const was = sheetState;
+    sheetState = state;
+    const on = !!link() && !!SHEET_LABELS[state];
+    syncEl.hidden = !on;
+    syncEl.textContent = on ? SHEET_LABELS[state] : '';
+    syncEl.title = note || '';
+    syncEl.classList.toggle('warn', state === 'paused' || state === 'error');
+    if ((state === 'paused' || state === 'error') && state !== was) toast('Sheet: ' + (note || SHEET_LABELS[state]), null, 6000);
+  }
+
+  function callSheet(cfg, body) {
+    // A plain-text body keeps this a simple request, which Google's web apps accept from another site.
+    return fetch(cfg.url, { method: 'POST', body: JSON.stringify(Object.assign({ key: cfg.key }, body)) })
+      .then((res) => res.json());
+  }
+
+  let sending = false, sendAgain = false, sendTimer = 0;
+  function queueSend(ms) { clearTimeout(sendTimer); sendTimer = setTimeout(sendLog, ms); }
+
+  function changed() {
+    setUnsent(true);
+    if (link()) { setSheet('waiting'); queueSend(1200); }
+  }
+
+  // One row per entry in the sheet's format: id, time, what, value, note.
+  // The id is the night and the half, so the two entries of a night sit side by side.
+  function sheetRows() {
+    return entries.map((e) => ({
+      id: nightOf(e) + '_' + SLOT_CSV[e.slot], time: e.at, what: SLOT_SHEET[e.slot], value: e.rating, note: e.note
+    }));
+  }
+
+  async function sendLog() {
+    const cfg = link();
+    if (!cfg) { setSheet(''); return; }
+    if (sending) { sendAgain = true; return; }
+    if (!unsent()) { setSheet('sent'); return; }
+    sending = true;
+    sendAgain = false;
+    setSheet('sending');
+    syncLocal();
+    let res = null;
+    try { res = await callSheet(cfg, { source: SOURCE, rows: sheetRows() }); } catch (_) {}
+    sending = false;
+    if (res && res.ok) {
+      if (!sendAgain) setUnsent(false);
+      try { localStorage.setItem(SENT_ONCE, '1'); } catch (_) {}
+      setSheet('sent');
+    } else if (res && res.code === 'shrink') {
+      setSheet('paused', res.error);
+    } else if (res) {
+      setSheet('error', res.error || 'it said no');
+    } else {
+      setSheet('waiting');
+    }
+    if (sendAgain) queueSend(300);
+  }
+  const sendIfNeeded = () => { if (link() && unsent()) queueSend(0); };
+
+  // The setup link: saves where to send, checks the sheet answers, then sends what's already here.
+  function setupFromLink() {
+    const hp = new URLSearchParams(location.hash.slice(1));
+    const url = hp.get('log'), key = hp.get('key');
+    if (!url && !key) return false;
+    history.replaceState(null, '', location.pathname + location.search);
+    if (!url || !key || !okUrl(url)) { toast('That setup link doesn’t look right', null, 5000); return true; }
+    try { localStorage.setItem(LINK, JSON.stringify({ url, key })); }
+    catch (_) { toast('Couldn’t save the sync setting in this browser', null, 5000); return true; }
+    setUnsent(true);
+    setSheet('sending');
+    callSheet({ url, key }, { ping: true }).then((res) => {
+      if (res && res.ok) {
+        toast('Sync is on: entries now go to the sheet', null, 4000);
+        sendIfNeeded();
+      } else {
+        setSheet('error', (res && res.error) || 'no answer');
+      }
+    }).catch(() => {
+      // Online but no readable answer usually means the web app isn't shared with Anyone.
+      if (navigator.onLine) setSheet('error', 'couldn’t reach the sheet: check the web app’s access is set to Anyone');
+      else setSheet('waiting');
+    });
+    return true;
+  }
+  function startSheet() {
+    if (setupFromLink() || !link()) return;
+    try { if (localStorage.getItem(SENT_ONCE) !== '1') setUnsent(true); } catch (_) {}
+    if (unsent()) queueSend(0); else setSheet('sent');
+  }
 
   /* ---------- start ---------- */
 
-  function syncLocal() {
-    const r = readLocal();
-    if (r.ok) entries = r.list;
-  }
-
-  function unavailable(msg) {
-    phase = 'unavailable';
-    col = null;
-    saveEntry = null;
-    setNotice(msg);
-    render();
-  }
-
   function registerWorker() {
     if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
-    // When a newer version takes over, reload once so it shows up without any effort.
+    // When a newer version takes over, reload once so it shows up without any effort (after the sheet closes, if it's open).
     const hadWorker = !!navigator.serviceWorker.controller;
-    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadWorker) location.reload(); });
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadWorker) return;
+      if (sheet.open) needsReload = true; else location.reload();
+    });
     const go = () => { navigator.serviceWorker.register('sw.js').catch(() => {}); };
     if (document.readyState === 'complete') go(); else window.addEventListener('load', go);
   }
 
-  function bootLocal() {
-    mode = 'local';
-    try { localStorage.setItem(KEY + '.probe', '1'); localStorage.removeItem(KEY + '.probe'); } catch (e) { canSave = false; }
-    const r = readLocal();
-    entries = r.list;
-    if (!r.ok) canSave = false;
-    if (canSave) saveEntry = async (e) => saveLocal(e); else setNotice(NO_LOCAL);
-    // Ask the browser not to clear this data when the phone is short on space.
-    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}
-    phase = 'ready';
-    render();
-    scrollToEnd(true);
-    window.addEventListener('storage', (ev) => {
-      if (ev.key === KEY || ev.key === null) { syncLocal(); render(); }
-    });
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) { syncLocal(); rollDay(); render(); } });
-    registerWorker();
-  }
-
-  async function bootCloud(cl) {
-    mode = 'cloud';
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
-    let db = null, user = null;
-    try { [db, user] = await Promise.all([cl.use('db'), cl.use('user')]); } catch (e) {}
-    if (!db || !user) return unavailable(NO_CLOUD);
-    let uid = null;
-    try { uid = await user.id(); } catch (e) {}
-    if (!uid) return unavailable(NO_CLOUD);
-    try { col = db.collection('data/users/' + uid + '/log/entries'); } catch (e) { return unavailable(NO_CLOUD); }
-    saveEntry = saveCloud;
-
-    phase = 'loading';
-    render();
-    const slow = setTimeout(() => { if (phase === 'loading') { phase = 'ready'; render(); } }, 6000);
-    let first = true;
-
-    col.orderBy('date', 'desc').limit(MAX_DOCS).onSnapshot((snap) => {
-      const next = [];
-      snap.docs.forEach((d) => {
-        if (d.metadata && d.metadata.hasPendingWrites) return;   // our own save, shown once it is confirmed
-        const x = d.data();
-        if (isEntry(x)) next.push(clean(x));
-      });
-      entries = next;
-      const seen = new Set(next.map((e) => idOf(e.date, e.slot)));
-      fresh.forEach((e, id) => { if (seen.has(id)) fresh.delete(id); });
-      if (phase === 'loading' && (!snap.metadata.fromCache || next.length)) { phase = 'ready'; clearTimeout(slow); }
-      if (phase !== 'ready') return;
-      render();
-      if (first) { first = false; scrollToEnd(true); }
-    }, (err) => {
-      clearTimeout(slow);
-      unavailable(err && err.code === 'revoked'
-        ? 'Access to your log changed. Reload the page to try again.'
-        : 'Lost the connection to your log. Reload the page to try again.');
-    });
-  }
-
-  // A fresh start, once per browser: the first time this version opens, the log saved in this browser is cleared.
+  // A fresh start, once per browser: the first time the Sleep Log opened, the log saved in this browser was cleared.
   // The marker is written first, so if the browser won't take it nothing is deleted, and it never runs twice.
   // Only this app's own keys are touched; other apps on the same site keep theirs.
   function freshStart() {
@@ -875,15 +1234,27 @@ form { margin: 0; display: grid; gap: 8px; }
   }
 
   function boot() {
-    const cl = window.claude;
-    const cloud = !!(cl && typeof cl.use === 'function');
-    if (!cloud) freshStart();
+    freshStart();
     shownDay = dayOf(new Date());
     loadDraft();
+    try { localStorage.setItem(KEY + '.probe', '1'); localStorage.removeItem(KEY + '.probe'); } catch (e) { canSave = false; }
+    const r = readLocal();
+    entries = r.list;
+    if (!r.ok) canSave = false;
+    if (!canSave) setNotice(NO_LOCAL);
+    // Ask the browser not to clear this data when the phone is short on space.
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}
     render();
+    scrollToEnd(true);
     schedule();
-    if (cloud) return bootCloud(cl);
-    bootLocal();
+    window.addEventListener('storage', (ev) => {
+      if (ev.key === KEY || ev.key === null) { syncLocal(); render(); }
+    });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { syncLocal(); rollDay(); render(); sendIfNeeded(); } });
+    window.addEventListener('online', sendIfNeeded);
+    window.addEventListener('hashchange', setupFromLink);   // the setup link tapped while the app is already open
+    registerWorker();
+    startSheet();
   }
 
   boot();
