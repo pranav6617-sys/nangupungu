@@ -1138,7 +1138,9 @@ form { margin: 0; display: grid; gap: 8px; }
 
   function changed() {
     setUnsent(true);
-    if (link()) { setSheet('waiting'); queueSend(1200); }
+    // A send already on its way was built before this change, so make sure another one follows it.
+    // Without this, an answer arriving within 1.2s of the change marked it as sent when it wasn't.
+    if (link()) { if (sending) sendAgain = true; setSheet('waiting'); queueSend(1200); }
   }
 
   // One row per entry in the sheet's format: id, time, what, value, note.
