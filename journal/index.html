@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="A quiet page for each day. Write a little now, or everything tonight.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Journal">
+  <title>Journal</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <button type="button" class="icon-button" id="open-history" aria-label="Previous days" aria-haspopup="dialog" aria-controls="history" aria-expanded="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <span class="app-name">Journal</span>
+    <button type="button" id="sheet-sync" class="sync" title="Open a setup link to connect your sheet">not synced yet</button>
+  </header>
+
+  <main id="page">
+    <div id="notice" class="notice" role="status" hidden></div>
+    <p class="eyebrow" id="day-label">Today</p>
+    <h1 id="date-title"></h1>
+    <ol id="entries" aria-label="Journal entries"></ol>
+    <section id="old-draft" class="old-draft" aria-label="Unsent draft" hidden>
+      <p class="eyebrow">Unsent draft · saved on this device</p>
+      <p id="old-draft-text" class="entry-note"></p>
+    </section>
+    <form id="composer">
+      <label class="sr-only" for="note">What happened today?</label>
+      <textarea id="note" placeholder="What happened today?" maxlength="50000" rows="5" aria-describedby="help" spellcheck="true"></textarea>
+      <div class="composer-bottom">
+        <span id="help">Submitted entries stay as they are.</span>
+        <button type="submit" id="send" disabled>Send <span aria-hidden="true">↑</span></button>
+      </div>
+    </form>
+    <p id="past-note" class="past-note" hidden>This day is read-only.</p>
+  </main>
+
+  <dialog id="history" aria-labelledby="history-title">
+    <div class="history-heading"><h2 id="history-title">Your days</h2><button type="button" class="icon-button" id="close-history" aria-label="Close previous days">×</button></div>
+    <nav id="days" aria-label="Journal days"></nav>
+    <p class="history-footnote">A new day starts at 4 am<br>New Zealand time.</p>
+  </dialog>
+  <div id="toast" role="status" hidden></div>
+  <p class="sr-only" id="live" aria-live="polite"></p>
+</body>
+</html>

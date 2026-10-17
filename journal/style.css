@@ -1,0 +1,45 @@
+:root { color-scheme: light; --ink:#37352f; --muted:#92918e; --line:#ececea; --paper:#fff; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--paper); color:var(--ink); font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; -webkit-font-smoothing:antialiased; }
+button,textarea { font:inherit; color:inherit; }
+button { cursor:pointer; touch-action:manipulation; }
+button:disabled { cursor:default; opacity:.35; }
+[hidden] { display:none !important; }
+button:focus-visible,textarea:focus-visible { outline:2px solid #9eabb4; outline-offset:4px; }
+.topbar { display:flex; align-items:center; gap:8px; padding:12px max(16px,env(safe-area-inset-right)) 12px max(12px,env(safe-area-inset-left)); }
+.icon-button { border:0; background:transparent; border-radius:5px; width:40px; height:40px; display:grid; place-items:center; font-size:28px; }
+.icon-button:hover { background:#f4f4f2; }
+.icon-button svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.5; }
+.app-name { font-size:14px; }
+.sync { margin-left:auto; border:0; padding:10px 4px; background:transparent; color:var(--muted); font-size:12px; }
+.sync.warn { color:#9d6235; }
+main { width:min(100%,744px); margin:64px auto 0; padding:0 40px calc(64px + env(safe-area-inset-bottom)); }
+.eyebrow { color:var(--muted); font-size:12px; margin:0 0 12px; }
+h1 { font-size:clamp(28px,4.2vw,38px); line-height:1.2; letter-spacing:-1.1px; font-weight:700; margin:0 0 48px; overflow-wrap:anywhere; }
+#entries { padding:0; margin:0; list-style:none; }
+.entry { position:relative; margin:0 0 28px; }
+.entry time { display:block; font-size:11px; color:var(--muted); margin-bottom:7px; font-variant-numeric:tabular-nums; }
+.entry-note { margin:0; font-size:16px; line-height:1.75; white-space:pre-wrap; overflow-wrap:anywhere; }
+form { margin-top:12px; }
+textarea { display:block; width:100%; min-height:160px; max-height:55dvh; padding:0; border:0; resize:none; background:transparent; font-size:16px; line-height:1.75; border-radius:2px; }
+textarea::placeholder { color:#b1b0ac; }
+.composer-bottom { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-top:16px; border-top:1px solid var(--line); }
+#help,.past-note { color:var(--muted); font-size:12px; line-height:1.6; }
+#send { border:1px solid #dededb; background:#fff; border-radius:5px; padding:9px 13px; font-size:13px; white-space:nowrap; }
+#send:hover:enabled { background:#f7f7f5; }
+#send span { margin-left:10px; }
+.past-note { border-top:1px solid var(--line); padding-top:18px; margin-top:40px; }
+.notice { padding:12px 14px; margin:0 0 28px; background:#fff6e9; border-radius:4px; font-size:13px; line-height:1.6; }
+dialog { position:fixed; inset:0 auto 0 0; width:min(300px,88vw); height:100dvh; max-width:none; max-height:none; margin:0; padding:18px 14px calc(20px + env(safe-area-inset-bottom)); border:0; background:#f7f7f5; box-shadow:5px 0 30px #00000012; }
+dialog::backdrop { background:#0002; }
+.history-heading { display:flex; align-items:center; justify-content:space-between; padding-left:10px; margin-bottom:24px; }
+h2 { font-size:15px; font-weight:600; margin:0; }
+#days { display:grid; gap:4px; }
+.day-button { width:100%; text-align:left; border:0; border-radius:5px; background:transparent; padding:12px 10px; font-size:14px; }
+.day-button:hover,.day-button[aria-current="date"] { background:#eaeae7; }
+.day-button small { display:block; color:var(--muted); font-size:11px; margin-top:4px; }
+.history-footnote { padding:24px 10px 0; color:var(--muted); font-size:11px; line-height:1.7; }
+.old-draft { border-left:2px solid var(--line); margin:24px 0; padding-left:16px; }
+#toast { position:fixed; bottom:calc(24px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); width:max-content; max-width:calc(100vw - 32px); padding:12px 18px; border-radius:6px; background:#37352f; color:white; font-size:13px; line-height:1.5; z-index:3; box-shadow:0 4px 24px #0002; }
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+@media(max-width:600px) { main { margin-top:42px; padding-left:24px; padding-right:24px; } h1 { margin-bottom:36px; } .composer-bottom { gap:12px; } #help { max-width:220px; } }
