@@ -1,6 +1,6 @@
 // Keeps the page openable with no signal: it loads the newest copy when it can and falls back to the saved one.
-const CACHE = 'journal-v1';
-const SHELL = ['./', 'index.html', 'app.js', 'style.css', 'manifest.json', 'icon.svg'];
+const CACHE = 'journal-v2';
+const SHELL = ['./', 'index.html', 'app.js', 'style.css', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(

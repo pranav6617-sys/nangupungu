@@ -1,8 +1,9 @@
 {
   "name": "Nangu Pangu",
   "short_name": "NanguPangu",
-  "start_url": "/nangupungu/",
-  "scope": "/nangupungu/",
+  "id": "/nangupungu/",
+  "start_url": "/nangupungu/index.html",
+  "scope": "/nangupungu/index.html",
   "display": "standalone",
   "background_color": "#dd9530",
   "theme_color": "#dd9530",
