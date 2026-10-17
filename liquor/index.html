@@ -120,6 +120,7 @@ body {
 .log-head .name { color: var(--ink); font-weight: 650; letter-spacing: .02em; }
 .status { color: var(--muted); font-weight: 450; }
 .status::before { content: "· "; }
+.status.warn { color: var(--danger); }
 .legend { display: flex; gap: 14px; }
 .legend span { display: inline-flex; align-items: center; gap: 5px; }
 .legend .ico { color: var(--k-ink); }
@@ -399,7 +400,7 @@ body {
 
   <section class="log" aria-label="Drink log">
     <div class="log-head">
-      <div><span class="name">liquor log</span> <span class="status" id="status" hidden></span> <button type="button" class="copy-btn" id="copy-csv" aria-label="Copy CSV of the whole log">copy csv</button></div>
+      <div><span class="name">liquor log</span> <span class="status" id="status" hidden></span> <span class="status" id="sheet-sync" hidden></span> <button type="button" class="copy-btn" id="copy-csv" aria-label="Copy CSV of the whole log">copy csv</button></div>
       <div class="legend" aria-label="Key">
         <span class="beer"><svg class="ico sm" aria-hidden="true"><use href="#i-beer"/></svg>beer</span>
         <span class="wine"><svg class="ico sm" aria-hidden="true"><use href="#i-wine"/></svg>wine</span>
@@ -484,6 +485,7 @@ body {
     del: $('edit-delete'), cancel: $('edit-cancel'),
     toast: $('toast'), toastMsg: $('toast-msg'), undo: $('toast-undo'),
     copy: $('copy-csv'), csvSheet: $('csv-sheet'), csvText: $('csv-text'), csvClose: $('csv-close'),
+    sheetSync: $('sheet-sync'),
   };
 
   const pad = n => String(n).padStart(2, '0');
@@ -526,6 +528,7 @@ body {
     try { localStorage.setItem(KEY, JSON.stringify(drinks)); canSave = true; }
     catch (_) { canSave = false; }
     renderStatus();
+    if (canSave) changed();
   }
 
   // Pick up changes made in another tab, without dropping anything that failed to save here.
@@ -870,11 +873,125 @@ body {
   els.csvClose.addEventListener('click', () => els.csvSheet.close());
   els.csvSheet.addEventListener('click', e => { if (e.target === els.csvSheet) els.csvSheet.close(); });
 
+  // ---------- sending the log to the Tracking log sheet ----------
+  // Off until the setup link (…/#log=<web app address>&key=<key>) has been opened in any tracker on this site.
+  // Every change sends the whole log, so edits and deletes reach the sheet too. A send that
+  // fails (no signal) is repeated when the app is next opened or comes back online.
+  const LINK = 'tracking-log.link.v1';   // one setting for every tracker on this site
+  const UNSENT = KEY + '.unsent';
+  const SENT_ONCE = KEY + '.sent-once';  // until the first send, the whole existing log still needs to go
+  const SOURCE = 'liquor_app';
+  const okUrl = u => /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u) ||
+    /^http:\/\/(localhost|127\.0\.0\.1):\d+\/[\w/-]*$/.test(u);
+
+  function link() {
+    try {
+      const v = JSON.parse(localStorage.getItem(LINK) || 'null');
+      if (v && typeof v.url === 'string' && okUrl(v.url) && typeof v.key === 'string' && v.key) return v;
+    } catch (_) {}
+    return null;
+  }
+  const unsent = () => { try { return localStorage.getItem(UNSENT) === '1'; } catch (_) { return false; } };
+  const setUnsent = on => { try { if (on) localStorage.setItem(UNSENT, '1'); else localStorage.removeItem(UNSENT); } catch (_) {} };
+
+  const SHEET_LABELS = { sent: 'synced', sending: 'syncing…', waiting: 'not synced yet', paused: 'sync paused', error: 'sync error' };
+  let sheetState = '';
+  function setSheet(state, note) {
+    const was = sheetState;
+    sheetState = state;
+    const on = !!link() && !!SHEET_LABELS[state];
+    els.sheetSync.hidden = !on;
+    els.sheetSync.textContent = on ? SHEET_LABELS[state] : '';
+    els.sheetSync.title = note || '';
+    els.sheetSync.classList.toggle('warn', state === 'paused' || state === 'error');
+    if ((state === 'paused' || state === 'error') && state !== was) toast('Sheet: ' + (note || SHEET_LABELS[state]), null, 6000);
+  }
+
+  function callSheet(cfg, body) {
+    // A plain-text body keeps this a simple request, which Google's web apps accept from another site.
+    return fetch(cfg.url, { method: 'POST', body: JSON.stringify(Object.assign({ key: cfg.key }, body)) })
+      .then(res => res.json());
+  }
+
+  let sending = false, sendAgain = false, sendTimer = 0;
+  function queueSend(ms) { clearTimeout(sendTimer); sendTimer = setTimeout(sendLog, ms); }
+
+  function changed() {
+    setUnsent(true);
+    if (link()) { setSheet('waiting'); queueSend(1200); }
+  }
+
+  // One row per entry in the sheet's format: id, time, what, value (and note).
+  function sheetRows() {
+    return drinks.map(c => ({ id: c.id, time: stamp(c.at), what: c.kind, value: c.n }));
+  }
+
+  async function sendLog() {
+    const cfg = link();
+    if (!cfg) { setSheet(''); return; }
+    if (sending) { sendAgain = true; return; }
+    if (!unsent()) { setSheet('sent'); return; }
+    sending = true;
+    sendAgain = false;
+    setSheet('sending');
+    sync();
+    let res = null;
+    try { res = await callSheet(cfg, { source: SOURCE, rows: sheetRows() }); } catch (_) {}
+    sending = false;
+    if (res && res.ok) {
+      if (!sendAgain) setUnsent(false);
+      try { localStorage.setItem(SENT_ONCE, '1'); } catch (_) {}
+      setSheet('sent');
+    } else if (res && res.code === 'shrink') {
+      setSheet('paused', res.error);
+    } else if (res) {
+      setSheet('error', res.error || 'it said no');
+    } else {
+      setSheet('waiting');
+    }
+    if (sendAgain) queueSend(300);
+  }
+  const sendIfNeeded = () => { if (link() && unsent()) queueSend(0); };
+
+  // The setup link: saves where to send, checks the sheet answers, then sends what's already here.
+  function setupFromLink() {
+    const h = new URLSearchParams(location.hash.slice(1));
+    const url = h.get('log'), key = h.get('key');
+    if (!url && !key) return false;
+    history.replaceState(null, '', location.pathname + location.search);
+    if (!url || !key || !okUrl(url)) { toast('That setup link doesn’t look right', null, 5000); return true; }
+    try { localStorage.setItem(LINK, JSON.stringify({ url, key })); }
+    catch (_) { toast('Couldn’t save the sync setting in this browser', null, 5000); return true; }
+    setUnsent(true);
+    setSheet('sending');
+    callSheet({ url, key }, { ping: true }).then(res => {
+      if (res && res.ok) {
+        toast('Sync is on: drinks now go to the sheet', null, 4000);
+        sendIfNeeded();
+      } else {
+        setSheet('error', (res && res.error) || 'no answer');
+      }
+    }).catch(() => {
+      // Online but no readable answer usually means the web app isn't shared with Anyone.
+      if (navigator.onLine) setSheet('error', 'couldn’t reach the sheet: check the web app’s access is set to Anyone');
+      else setSheet('waiting');
+    });
+    return true;
+  }
+  function startSheet() {
+    if (setupFromLink() || !link()) return;
+    try { if (localStorage.getItem(SENT_ONCE) !== '1') setUnsent(true); } catch (_) {}
+    if (unsent()) queueSend(0); else setSheet('sent');
+  }
+
   // ---------- start ----------
   window.addEventListener('storage', e => { if (e.key === KEY || e.key === null) { sync(); render(); } });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { sync(); render(); } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { sync(); render(); sendIfNeeded(); } });
+  window.addEventListener('online', sendIfNeeded);
+  window.addEventListener('hashchange', setupFromLink);   // the setup link tapped while the app is already open
   setInterval(render, 60000);
   render();
+  startSheet();
 
   if ('serviceWorker' in navigator) {
     // When a newer version of the page takes over, reload once so it shows up without any effort.
