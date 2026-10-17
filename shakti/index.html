@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-<title>Shakti &amp; Meditation</title>
+<title>Shakti, Meditation &amp; Yoga</title>
 <meta name="theme-color" content="#F5F1EC" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#171514" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.json">
@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Recursive:wght,CASL,MONO@400..700,0..1,0..1&display=swap">
 <style>
-/* Layout: two big tiles (shakti mat, meditation) on top; a day-by-day docket of tappable sessions underneath. */
+/* Layout: two big tiles (shakti mat, meditation) with a yoga bar under them; a day-by-day docket of tappable sessions underneath. */
 :root {
   color-scheme: light dark;
   --ground: #F5F1EC;   /* warm sand */
@@ -24,6 +24,8 @@
   --shakti-ink: #8F3A22;
   --sit: #E4DAEE;      /* meditation: dusk plum */
   --sit-ink: #5A3A7E;
+  --yoga: #DCE8D5;     /* yoga: sage */
+  --yoga-ink: #3D6638;
   --sheet: #FBF9F6;
   --scrim: rgba(36, 28, 26, .34);
   --danger: #A0443A;
@@ -33,7 +35,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --ground: #171514; --ink: #E9E4DE; --muted: #9B948C; --rule: #2A2624;
-    --shakti: #402820; --shakti-ink: #F2B59D; --sit: #2C2238; --sit-ink: #CDB6E8;
+    --shakti: #402820; --shakti-ink: #F2B59D; --sit: #2C2238; --sit-ink: #CDB6E8; --yoga: #22301F; --yoga-ink: #AED3A4;
     --sheet: #211E1C; --scrim: rgba(0, 0, 0, .55); --danger: #E68B7F;
   }
 }
@@ -58,7 +60,7 @@ body {
   gap: 24px;
 }
 
-/* the two buttons */
+/* the buttons */
 .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .tile {
   appearance: none;
@@ -87,6 +89,19 @@ body {
 }
 .tile.shakti { background: var(--shakti); color: var(--shakti-ink); }
 .tile.meditation { background: var(--sit); color: var(--sit-ink); }
+/* yoga runs the full width under the two, with its figure beside the word */
+.tile.yoga {
+  grid-column: 1 / -1;
+  height: auto;
+  min-height: 84px;
+  display: flex;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 14px 22px;
+  background: var(--yoga);
+  color: var(--yoga-ink);
+}
+.tile.yoga svg { width: 40px; height: 40px; flex: none; }
 .tile:active { transform: scale(.97); }
 .tile:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 .tile.flash { animation: flash .6s ease-out; }
@@ -107,6 +122,7 @@ body {
 .log-head .name { color: var(--ink); font-weight: 650; letter-spacing: .02em; }
 .status { color: var(--muted); font-weight: 450; }
 .status::before { content: "· "; }
+.status.warn { color: var(--danger); }
 .legend { display: flex; gap: 14px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .copy-btn {
@@ -127,10 +143,11 @@ body {
 .copy-btn:active { transform: scale(.95); }
 .copy-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
 
-/* the mat is a ring, meditation is solid, so the two never rely on colour alone */
+/* the mat is a ring, meditation a solid dot and yoga a diamond, so the three never rely on colour alone */
 .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; box-sizing: border-box; flex: none; }
 .dot.shakti { border: 2px solid var(--shakti-ink); }
 .dot.meditation { background: var(--sit-ink); }
+.dot.yoga { border-radius: 2px; background: var(--yoga-ink); transform: rotate(45deg); }
 
 .days { list-style: none; margin: 0; padding: 0; }
 .month {
@@ -174,9 +191,11 @@ body {
 }
 .chip.shakti { background: var(--shakti); }
 .chip.meditation { background: var(--sit); }
+.chip.yoga { background: var(--yoga); }
 .chip .len { font-size: 13px; font-weight: 650; }
 .chip.shakti .len { color: var(--shakti-ink); }
 .chip.meditation .len { color: var(--sit-ink); }
+.chip.yoga .len { color: var(--yoga-ink); }
 .chip .len.unset { font-weight: 450; }
 .chip:active { transform: scale(.95); }
 .chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
@@ -219,6 +238,8 @@ body {
 }
 #kind-shakti:checked + label { background: var(--shakti); border-color: var(--shakti); color: var(--shakti-ink); }
 #kind-meditation:checked + label { background: var(--sit); border-color: var(--sit); color: var(--sit-ink); }
+#kind-yoga + label { grid-column: 1 / -1; }
+#kind-yoga:checked + label { background: var(--yoga); border-color: var(--yoga); color: var(--yoga-ink); }
 .seg input:focus-visible + label { outline: 2px solid var(--ink); outline-offset: 2px; }
 .fields { display: grid; grid-template-columns: 1.35fr 1fr; gap: 10px; }
 .field { display: grid; gap: 6px; min-width: 0; font-size: 13px; color: var(--muted); }
@@ -359,14 +380,23 @@ body {
       </svg>
       <span>meditation</span>
     </button>
+    <button type="button" class="tile yoga" id="log-yoga" aria-label="Log a yoga session now">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="4.4" r="1.8" fill="currentColor" stroke="none"/>
+        <path d="M3.2 9.4h17.6M12 7.6v6.6"/>
+        <path d="M12 14.2H7.4v6.4H5.6M12 14.2l6.4 6.4h2"/>
+      </svg>
+      <span>yoga</span>
+    </button>
   </section>
 
   <section class="log" aria-label="Session log">
     <div class="log-head">
-      <div><span class="name">session log</span> <span class="status" id="status" hidden></span> <button type="button" class="copy-btn" id="copy-csv" aria-label="Copy CSV of the whole log">copy csv</button></div>
+      <div><span class="name">session log</span> <span class="status" id="status" hidden></span> <span class="status" id="sheet-sync" hidden></span> <button type="button" class="copy-btn" id="copy-csv" aria-label="Copy CSV of the whole log">copy csv</button></div>
       <div class="legend" aria-label="Key">
         <span><i class="dot shakti" aria-hidden="true"></i>shakti mat</span>
         <span><i class="dot meditation" aria-hidden="true"></i>meditation</span>
+        <span><i class="dot yoga" aria-hidden="true"></i>yoga</span>
       </div>
     </div>
     <ul class="days" id="days"></ul>
@@ -382,6 +412,8 @@ body {
       <label for="kind-shakti"><i class="dot shakti" aria-hidden="true"></i>shakti mat</label>
       <input type="radio" name="kind" id="kind-meditation" value="meditation">
       <label for="kind-meditation"><i class="dot meditation" aria-hidden="true"></i>meditation</label>
+      <input type="radio" name="kind" id="kind-yoga" value="yoga">
+      <label for="kind-yoga"><i class="dot yoga" aria-hidden="true"></i>yoga</label>
     </div>
     <div class="fields">
       <label class="field" for="edit-day"><span>Day</span><select id="edit-day"></select></label>
@@ -442,11 +474,12 @@ body {
 
   const $ = id => document.getElementById(id);
   const els = {
-    shakti: $('log-shakti'), meditation: $('log-meditation'), days: $('days'), empty: $('empty'), status: $('status'),
+    shakti: $('log-shakti'), meditation: $('log-meditation'), yoga: $('log-yoga'), days: $('days'), empty: $('empty'), status: $('status'),
     sheet: $('sheet'), form: $('edit-form'), day: $('edit-day'), time: $('edit-time'), len: $('edit-len'), note: $('edit-note'),
     del: $('edit-delete'), cancel: $('edit-cancel'),
     toast: $('toast'), toastMsg: $('toast-msg'), act: $('toast-act'), undo: $('toast-undo'),
     copy: $('copy-csv'), csvSheet: $('csv-sheet'), csvText: $('csv-text'), csvClose: $('csv-close'),
+    sheetSync: $('sheet-sync'),
   };
   const quickBtns = [...document.querySelectorAll('.quick button')];
 
@@ -460,14 +493,15 @@ body {
   const monthLabel = k => { const d = fromKey(k); return MO[d.getMonth()] + ' ' + d.getFullYear(); };
   const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-  const NAMES = { shakti: 'Shakti mat', meditation: 'Meditation' };
-  const ACTIVITY = { shakti: 'shakti_mat', meditation: 'meditation' };
+  const NAMES = { shakti: 'Shakti mat', meditation: 'Meditation', yoga: 'Yoga' };
+  const ACTIVITY = { shakti: 'shakti_mat', meditation: 'meditation', yoga: 'yoga' };
+  const KINDS = Object.keys(NAMES);
   const kindName = k => NAMES[k] || '';
 
   // A length is a whole number of minutes, from one minute to a full day. Anything else counts as "not set".
   const goodMins = v => (Number.isInteger(v) && v >= 1 && v <= 1440 ? v : null);
   const isSession = s => !!s && typeof s.id === 'string' && s.id.length > 0 &&
-    (s.kind === 'shakti' || s.kind === 'meditation') && Number.isFinite(s.at);
+    KINDS.includes(s.kind) && Number.isFinite(s.at);
 
   const plural = (n, word) => n + ' ' + word + (n === 1 ? '' : 's');
   // 25 -> 25m, 60 -> 1h, 65 -> 1h05
@@ -501,6 +535,7 @@ body {
     try { localStorage.setItem(KEY, JSON.stringify(log)); canSave = true; }
     catch (_) { canSave = false; }
     renderStatus();
+    if (canSave) changed();
   }
 
   // Pick up changes made in another tab, without dropping anything that failed to save here.
@@ -657,6 +692,7 @@ body {
   }
   els.shakti.addEventListener('click', () => logSession('shakti', els.shakti));
   els.meditation.addEventListener('click', () => logSession('meditation', els.meditation));
+  els.yoga.addEventListener('click', () => logSession('yoga', els.yoga));
 
   // ---------- editing ----------
   const MIN = 60000;
@@ -891,11 +927,125 @@ body {
   els.csvClose.addEventListener('click', () => els.csvSheet.close());
   els.csvSheet.addEventListener('click', e => { if (e.target === els.csvSheet) els.csvSheet.close(); });
 
+  // ---------- sending the log to the Tracking log sheet ----------
+  // Off until the setup link (…/#log=<web app address>&key=<key>) has been opened in any tracker on this site.
+  // Every change sends the whole log, so edits and deletes reach the sheet too. A send that
+  // fails (no signal) is repeated when the app is next opened or comes back online.
+  const LINK = 'tracking-log.link.v1';   // one setting for every tracker on this site
+  const UNSENT = KEY + '.unsent';
+  const SENT_ONCE = KEY + '.sent-once';  // until the first send, the whole existing log still needs to go
+  const SOURCE = 'shakti_app';
+  const okUrl = u => /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u) ||
+    /^http:\/\/(localhost|127\.0\.0\.1):\d+\/[\w/-]*$/.test(u);
+
+  function link() {
+    try {
+      const v = JSON.parse(localStorage.getItem(LINK) || 'null');
+      if (v && typeof v.url === 'string' && okUrl(v.url) && typeof v.key === 'string' && v.key) return v;
+    } catch (_) {}
+    return null;
+  }
+  const unsent = () => { try { return localStorage.getItem(UNSENT) === '1'; } catch (_) { return false; } };
+  const setUnsent = on => { try { if (on) localStorage.setItem(UNSENT, '1'); else localStorage.removeItem(UNSENT); } catch (_) {} };
+
+  const SHEET_LABELS = { sent: 'synced', sending: 'syncing…', waiting: 'not synced yet', paused: 'sync paused', error: 'sync error' };
+  let sheetState = '';
+  function setSheet(state, note) {
+    const was = sheetState;
+    sheetState = state;
+    const on = !!link() && !!SHEET_LABELS[state];
+    els.sheetSync.hidden = !on;
+    els.sheetSync.textContent = on ? SHEET_LABELS[state] : '';
+    els.sheetSync.title = note || '';
+    els.sheetSync.classList.toggle('warn', state === 'paused' || state === 'error');
+    if ((state === 'paused' || state === 'error') && state !== was) toast('Sheet: ' + (note || SHEET_LABELS[state]), null, 6000);
+  }
+
+  function callSheet(cfg, body) {
+    // A plain-text body keeps this a simple request, which Google's web apps accept from another site.
+    return fetch(cfg.url, { method: 'POST', body: JSON.stringify(Object.assign({ key: cfg.key }, body)) })
+      .then(res => res.json());
+  }
+
+  let sending = false, sendAgain = false, sendTimer = 0;
+  function queueSend(ms) { clearTimeout(sendTimer); sendTimer = setTimeout(sendLog, ms); }
+
+  function changed() {
+    setUnsent(true);
+    if (link()) { setSheet('waiting'); queueSend(1200); }
+  }
+
+  // One row per entry in the sheet's format: id, time, what, value (and note).
+  function sheetRows() {
+    return log.map(s => ({ id: s.id, time: stamp(s.at), what: s.kind, value: s.mins == null ? '' : s.mins }));
+  }
+
+  async function sendLog() {
+    const cfg = link();
+    if (!cfg) { setSheet(''); return; }
+    if (sending) { sendAgain = true; return; }
+    if (!unsent()) { setSheet('sent'); return; }
+    sending = true;
+    sendAgain = false;
+    setSheet('sending');
+    sync();
+    let res = null;
+    try { res = await callSheet(cfg, { source: SOURCE, rows: sheetRows() }); } catch (_) {}
+    sending = false;
+    if (res && res.ok) {
+      if (!sendAgain) setUnsent(false);
+      try { localStorage.setItem(SENT_ONCE, '1'); } catch (_) {}
+      setSheet('sent');
+    } else if (res && res.code === 'shrink') {
+      setSheet('paused', res.error);
+    } else if (res) {
+      setSheet('error', res.error || 'it said no');
+    } else {
+      setSheet('waiting');
+    }
+    if (sendAgain) queueSend(300);
+  }
+  const sendIfNeeded = () => { if (link() && unsent()) queueSend(0); };
+
+  // The setup link: saves where to send, checks the sheet answers, then sends what's already here.
+  function setupFromLink() {
+    const h = new URLSearchParams(location.hash.slice(1));
+    const url = h.get('log'), key = h.get('key');
+    if (!url && !key) return false;
+    history.replaceState(null, '', location.pathname + location.search);
+    if (!url || !key || !okUrl(url)) { toast('That setup link doesn’t look right', null, 5000); return true; }
+    try { localStorage.setItem(LINK, JSON.stringify({ url, key })); }
+    catch (_) { toast('Couldn’t save the sync setting in this browser', null, 5000); return true; }
+    setUnsent(true);
+    setSheet('sending');
+    callSheet({ url, key }, { ping: true }).then(res => {
+      if (res && res.ok) {
+        toast('Sync is on: sessions now go to the sheet', null, 4000);
+        sendIfNeeded();
+      } else {
+        setSheet('error', (res && res.error) || 'no answer');
+      }
+    }).catch(() => {
+      // Online but no readable answer usually means the web app isn't shared with Anyone.
+      if (navigator.onLine) setSheet('error', 'couldn’t reach the sheet: check the web app’s access is set to Anyone');
+      else setSheet('waiting');
+    });
+    return true;
+  }
+  function startSheet() {
+    if (setupFromLink() || !link()) return;
+    try { if (localStorage.getItem(SENT_ONCE) !== '1') setUnsent(true); } catch (_) {}
+    if (unsent()) queueSend(0); else setSheet('sent');
+  }
+
   // ---------- start ----------
   window.addEventListener('storage', e => { if (e.key === KEY || e.key === null) { sync(); render(); } });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { sync(); render(); } });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { sync(); render(); sendIfNeeded(); } });
+  window.addEventListener('online', sendIfNeeded);
+  window.addEventListener('hashchange', setupFromLink);   // the setup link tapped while the app is already open
   setInterval(render, 60000);
   render();
+  startSheet();
 
   if ('serviceWorker' in navigator) {
     // When a newer version of the page takes over, reload once so it shows up without any effort.
