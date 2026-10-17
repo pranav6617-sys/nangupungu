@@ -1,5 +1,5 @@
 // Keeps the page openable with no signal: it loads the newest copy when it can and falls back to the saved one.
-const CACHE = 'coffee-log-v3';
+const CACHE = 'coffee-log-v4';
 const SHELL = ['./', 'index.html', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 
