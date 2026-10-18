@@ -8,11 +8,11 @@
   const KEY = 'mood.v1', LINK = 'tracking-log.link.v1', ACK = KEY + '.receipt';
   const SOURCE = 'mood_app', ZONE = 'Pacific/Auckland';
   const RATINGS = [
-    { id: 'mood', title: 'Mood', labels: ['Very unpleasant', 'Unpleasant', 'Neutral', 'Pleasant', 'Very pleasant'], color: '#deaa89', tint: '#f3dbc6' },
-    { id: 'energy', title: 'Energy', labels: ['Depleted', 'Low', 'Moderate', 'Energised', 'Highly energised'], color: '#b5a1dc', tint: '#e3dbf2' },
-    { id: 'tension', title: 'Tension', labels: ['Relaxed', 'A little tense', 'Tense', 'Very tense', 'Wound up'], color: '#a1bca6', tint: '#dce7da' },
-    { id: 'irritability', title: 'Irritability', labels: ['Unbothered', 'A little touchy', 'Touchy', 'Very touchy', 'Extremely touchy'], color: '#d4b55d', tint: '#f0e5bd' },
-    { id: 'thought_speed', title: 'Thought speed', labels: ['Slowed', 'A little slow', 'Usual', 'Fast', 'Racing'], color: '#d79d9b', tint: '#efd6d1' }
+    { id: 'mood', title: 'Mood', labels: ['Very unpleasant', 'Unpleasant', 'Neutral', 'Pleasant', 'Very pleasant'], color: '#ff8b7c' },
+    { id: 'energy', title: 'Energy', labels: ['Depleted', 'Low', 'Moderate', 'Energised', 'Highly energised'], color: '#f3c85b' },
+    { id: 'tension', title: 'Tension', labels: ['Relaxed', 'A little tense', 'Tense', 'Very tense', 'Wound up'], color: '#65d2ba' },
+    { id: 'irritability', title: 'Irritability', labels: ['Unbothered', 'A little touchy', 'Touchy', 'Very touchy', 'Extremely touchy'], color: '#b59aff' },
+    { id: 'thought_speed', title: 'Thought speed', labels: ['Slowed', 'A little slow', 'Usual', 'Fast', 'Racing'], color: '#73b8ff' }
   ];
   const QUADRANTS = [
     { id: 'high-unpleasant', label: 'Higher energy · unpleasant', className: 'q-coral', x: 196, y: 196, words: ['Overwhelmed', 'Anxious', 'Frustrated', 'Angry', 'Tense', 'Restless', 'Irritated', 'Panicky'] },
@@ -66,6 +66,10 @@
   function mapPoint(ratings) {
     // The first two answers only suggest a place to start; nothing is selected or excluded.
     return { x: 105 + ((ratings.mood - 1) / 4) * 574, y: 105 + ((5 - ratings.energy) / 4) * 574 };
+  }
+  function startingQuadrant(ratings) {
+    // Midpoints lean toward pleasant/high only to break the tie; every area stays one tap away.
+    return `${ratings.energy >= 3 ? 'high' : 'low'}-${ratings.mood >= 3 ? 'pleasant' : 'unpleasant'}`;
   }
   function createStore({ storage, fetcher, uuid, locks, onStatus = () => {}, schedule = setTimeout, cancel = clearTimeout }) {
     let timer, sending = false, busySave = false, lastState = 'local', blocked = false, retries = 0;
@@ -163,5 +167,5 @@
       get state() { return lastState; }, destroy() { cancel(timer); } };
   }
   return { KEY, LINK, ACK, SOURCE, ZONE, RATINGS, QUADRANTS, WORDS, stamp, complete,
-    validEntry, readLog, readLink, sheetRows, mapPoint, createStore };
+    validEntry, readLog, readLink, sheetRows, mapPoint, startingQuadrant, createStore };
 });

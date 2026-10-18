@@ -43,6 +43,10 @@ test('five independently required ratings; 32 distinct words across four equal q
   assert.ok(D.mapPoint({ mood: 1, energy: 5 }).y < 392);
   assert.ok(D.mapPoint({ mood: 5, energy: 1 }).x > 392);
   assert.ok(D.mapPoint({ mood: 5, energy: 1 }).y > 392);
+  assert.equal(D.startingQuadrant({ mood: 1, energy: 5 }), 'high-unpleasant');
+  assert.equal(D.startingQuadrant({ mood: 5, energy: 5 }), 'high-pleasant');
+  assert.equal(D.startingQuadrant({ mood: 1, energy: 1 }), 'low-unpleasant');
+  assert.equal(D.startingQuadrant({ mood: 5, energy: 1 }), 'low-pleasant');
 });
 test('NZ timestamps retain the correct summer, winter and DST-transition offsets', () => {
   assert.equal(D.stamp(new Date('2026-10-18T01:00:00Z')), '2026-10-18T14:00:00+13:00');
