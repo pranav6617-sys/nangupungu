@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f3eb">
+  <meta name="description" content="A little check-in with how you feel, right now.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Mood">
+  <title>Mood · a little check-in</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="data.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <svg class="svg-defs" aria-hidden="true"><defs>
+    <symbol id="flower" viewBox="0 0 100 100"><path d="M50 25C32-3 7 19 23 40C-7 48 8 81 32 71C32 103 68 103 68 71C92 81 107 48 77 40C93 19 68-3 50 25Z" fill="currentColor"/><circle cx="50" cy="51" r="12" fill="#26232e"/></symbol>
+    <symbol id="arrow" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs></svg>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="Mood — new check-in"><svg aria-hidden="true"><use href="#flower"/></svg><span>mood<span class="brand-period">.</span></span></a>
+      <button class="sync-status" id="sheet-sync" type="button" title="Google Sheet connection"><span class="status-dot" aria-hidden="true"></span><span id="sync-label">On this device</span></button>
+    </header>
+    <div class="progress-row">
+      <ol class="progress" aria-label="Check-in progress">
+        <li aria-current="step"><span>1</span><span class="step-name">Check in</span></li>
+        <li><span>2</span><span class="step-name">Feelings</span></li>
+        <li><span>3</span><span class="step-name">Context</span></li>
+      </ol>
+      <button id="motion-toggle" class="motion-toggle" type="button" aria-pressed="true" aria-label="Turn off gentle motion" title="Turn off gentle motion"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8c4-7 6 7 10 0s6 0 8-2M3 16c4-7 6 7 10 0s6 0 8-2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+    </div>
+    <p id="notice" class="notice" role="alert" hidden></p>
+    <main id="main">
+      <section class="page" id="page-1" aria-labelledby="heading-1">
+        <div class="intro first-intro">
+          <p class="eyebrow">A LITTLE CHECK-IN</p>
+          <h1 id="heading-1" tabindex="-1">Right here,<br><span class="underline">right now.</span></h1>
+          <p class="intro-copy">Five little sliders. How are you feeling?</p>
+          <div class="floating-art" aria-hidden="true"><span class="orbit-dot"></span><svg class="hero-flower"><use href="#flower"/></svg><svg class="spark" viewBox="0 0 30 38"><path d="M15 1c0 13-3 17-14 18 11 1 14 5 14 18 0-13 3-17 14-18C18 18 15 14 15 1Z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></div>
+        </div>
+        <div class="ratings" id="ratings"></div>
+        <div class="page-footer">
+          <p class="footer-hint" id="rating-count" aria-live="polite">Tap or slide each one to begin.</p>
+          <button class="primary" id="next-1" type="button" disabled><span>Next</span><svg aria-hidden="true"><use href="#arrow"/></svg></button>
+        </div>
+      </section>
+      <section class="page" id="page-2" aria-labelledby="heading-2" hidden>
+        <div class="intro compact-intro"><p class="eyebrow">PUT A WORD TO IT <span class="optional">OPTIONAL</span></p><h1 id="heading-2" tabindex="-1">What feels close?</h1><p class="intro-copy">Explore the map. Tap as many as fit.</p></div>
+        <div class="map-toolbar"><span class="energy-label">↑ Higher energy</span><button id="recenter" class="text-button" type="button">My starting point <span aria-hidden="true">↗</span></button></div>
+        <div class="map-frame">
+          <div class="map-viewport" id="map-viewport" tabindex="0" role="region" aria-label="Feeling map. Scroll in any direction, or use the four area buttons below." aria-describedby="map-hint">
+            <div class="feeling-map" id="feeling-map"></div>
+          </div>
+          <span class="map-corner" aria-hidden="true">↗</span>
+        </div>
+        <div class="map-axis"><span>← Less pleasant</span><span>↓ Lower energy</span><span>More pleasant →</span></div>
+        <div class="map-navigation" aria-label="Move around the feeling map">
+          <button type="button" data-quadrant="high-unpleasant" class="quadrant-jump q-coral" aria-label="Go to higher energy, unpleasant feelings"><span aria-hidden="true">↖</span> Unpleasant · high</button>
+          <button type="button" data-quadrant="high-pleasant" class="quadrant-jump q-peach" aria-label="Go to higher energy, pleasant feelings"><span aria-hidden="true">↗</span> Pleasant · high</button>
+          <button type="button" data-quadrant="low-unpleasant" class="quadrant-jump q-lilac" aria-label="Go to lower energy, unpleasant feelings"><span aria-hidden="true">↙</span> Unpleasant · low</button>
+          <button type="button" data-quadrant="low-pleasant" class="quadrant-jump q-mint" aria-label="Go to lower energy, pleasant feelings"><span aria-hidden="true">↘</span> Pleasant · low</button>
+        </div>
+        <p id="map-hint" class="map-hint">Drag or scroll to wander. The areas are a guide.</p>
+        <div class="selection-row"><span id="selection-count" aria-live="polite">No words selected</span><div id="selected-words" class="selected-words" aria-label="Selected feelings"></div></div>
+        <div class="page-footer split-footer"><button class="back" data-back="1" type="button"><span aria-hidden="true">←</span> Back</button><button class="primary" id="next-2" type="button"><span>Next</span><svg aria-hidden="true"><use href="#arrow"/></svg></button></div>
+      </section>
+      <section class="page" id="page-3" aria-labelledby="heading-3" hidden>
+        <div class="intro context-intro"><p class="eyebrow">THE MOMENT AROUND YOU <span class="optional">OPTIONAL</span></p><h1 id="heading-3" tabindex="-1">A little context.</h1><p class="intro-copy">A few words, if you like.</p></div>
+        <form id="context-form">
+          <div class="context-field peach-field"><label for="doing"><span class="field-number">01</span> What am I doing?</label><textarea id="doing" name="doing" rows="3" maxlength="2000" placeholder="Making lunch, between meetings…"></textarea><span class="field-doodle" aria-hidden="true">↝</span></div>
+          <div class="context-field lilac-field"><label for="company"><span class="field-number">02</span> Who am I with?</label><textarea id="company" name="company" rows="3" maxlength="2000" placeholder="On my own, with a friend…"></textarea><svg class="field-flower" aria-hidden="true"><use href="#flower"/></svg></div>
+          <div class="context-note"><span class="tiny-dot" aria-hidden="true"></span><p>Just a snapshot of this moment.</p></div>
+          <div class="page-footer split-footer"><button class="back" data-back="2" type="button"><span aria-hidden="true">←</span> Back</button><button class="primary submit-button" id="submit" type="submit"><span>Submit</span><svg aria-hidden="true"><use href="#arrow"/></svg></button></div>
+        </form>
+      </section>
+    </main>
+    <footer class="bottom-note"><span>A moment, as it is.</span><span id="local-count">0 check-ins today</span></footer>
+  </div>
+  <div class="saved-overlay" id="saved-overlay" hidden aria-hidden="true"><div class="saved-bloom"><svg><use href="#flower"/></svg></div><p>Moment saved.</p></div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <p class="sr-only" id="live" role="status" aria-live="polite"></p>
+  <noscript><p class="notice">Turn on JavaScript to use this check-in. Your entries are saved in this browser.</p></noscript>
+</body>
+</html>
