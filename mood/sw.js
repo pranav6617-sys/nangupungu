@@ -1,4 +1,4 @@
-const CACHE = 'mood-v2';
+const CACHE = 'mood-v3';
 const SHELL = ['./', 'index.html', 'style.css', 'data.js', 'app.js', 'manifest.json', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL.map(url => new Request(url, { cache: 'reload' })))));

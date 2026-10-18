@@ -232,7 +232,7 @@ test('HTML, manifest and service worker keep an isolated installable dark app', 
   assert.equal(manifest.scope, manifest.id);
   assert.equal(manifest.start_url, manifest.id);
   assert.equal(manifest.theme_color, '#0b0d12');
-  assert.match(sw, /const CACHE = 'mood-v2'/);
+  assert.match(sw, /const CACHE = 'mood-v3'/);
   assert.match(sw, /key.startsWith\('mood-'\)/);
   assert.match(sw, /url.pathname.startsWith\(scope.pathname\)/);
   assert.match(html, /id="page-2"[^>]+hidden/);
