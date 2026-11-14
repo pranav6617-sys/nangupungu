@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#0F1015">
+  <title>Mood check-in · screen one</title>
+  <style>
+    /* Labels only need eight capital letters, so the font is cut down to a few kilobytes. */
+    @font-face{font-family:"Geist Mono";src:url(geist-mono-labels.woff2) format("woff2");font-weight:100 900;font-display:block}
+    :root{
+      --bg:#0F1015;          /* graphite */
+      --label:#B0B1B3;       /* silver-grey */
+      --dim:#505157;         /* the forward arrow before a choice */
+      --lavender:#ABA4DF;    /* the forward arrow after a choice, and the glow */
+      --safe-t:env(safe-area-inset-top,0px);
+      --safe-b:env(safe-area-inset-bottom,0px);
+      --safe-l:env(safe-area-inset-left,0px);
+      --safe-r:env(safe-area-inset-right,0px);
+      color-scheme:dark;
+      -webkit-text-size-adjust:100%;
+      text-size-adjust:100%;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+    body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+    button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    :focus-visible{outline:1.5px solid var(--label);outline-offset:4px}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+    /* The whole screen is the field. app-h follows the visible part of the screen. */
+    .wave{position:fixed;left:0;top:var(--app-top,0px);width:100%;height:var(--app-h,100dvh);overflow:hidden;background:var(--bg);touch-action:none}
+    .field{position:absolute;inset:0;width:100%;height:100%;display:block}
+    .hit{position:absolute;inset:0;touch-action:none;cursor:crosshair}
+    /* A breath of light under the lit dots. It sits exactly under the finger and never slides. */
+    .halo{position:absolute;left:0;top:0;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;pointer-events:none;opacity:0;
+      background:radial-gradient(circle,rgba(171,164,223,.075) 0,rgba(171,164,223,.03) 40%,rgba(171,164,223,0) 70%);transition:opacity .35s ease}
+    .halo.now{transition:none}
+
+    .axis{position:absolute;font-family:"Geist Mono",ui-monospace,"Roboto Mono",monospace;font-size:11.2px;font-weight:400;line-height:1;letter-spacing:.09em;color:var(--label);white-space:nowrap;pointer-events:none}
+    .axis-high{top:calc(var(--safe-t) + 58px);left:50%;transform:translateX(-50%);padding-left:.09em}
+    .axis-low{bottom:calc(var(--safe-b) + 66px);left:50%;transform:translateX(-50%);padding-left:.09em}
+    .axis-left{left:calc(var(--safe-l) + 10px);top:48%;transform:translateY(-50%)}
+    .axis-right{right:calc(var(--safe-r) + 8px);top:48%;transform:translateY(-50%)}
+
+    .back{position:absolute;z-index:3;top:calc(var(--safe-t) + 2px);left:calc(var(--safe-l) + 6px);width:52px;height:46px;display:grid;place-items:center;color:var(--label)}
+    .back svg{width:22px;height:14px}
+    .next{position:absolute;z-index:3;right:calc(var(--safe-r) + 12px);bottom:calc(var(--safe-b) + 14px);width:61px;height:61px;display:grid;place-items:center;color:var(--dim);transition:color .3s ease,transform .15s ease}
+    .next svg{width:52px;height:52px;overflow:visible}
+    .next.on{color:var(--lavender)}
+    .next.on:active{transform:scale(.95)}
+    .next.pressed{transform:scale(.93)}
+    @media (prefers-reduced-motion:reduce){.halo,.next{transition:none!important}}
+  </style>
+</head>
+<body>
+  <main class="wave" id="wave">
+    <canvas class="field" id="field" aria-hidden="true"></canvas>
+    <div class="halo" id="halo" aria-hidden="true"></div>
+    <div class="hit" id="hit" aria-hidden="true"></div>
+
+    <span class="axis axis-high" aria-hidden="true">HIGH</span>
+    <span class="axis axis-low" aria-hidden="true">LOW</span>
+    <span class="axis axis-left" aria-hidden="true">UNPLEASANT</span>
+    <span class="axis axis-right" aria-hidden="true">PLEASANT</span>
+
+    <button class="back" id="back" type="button" aria-label="Back">
+      <svg viewBox="0 0 22 14" aria-hidden="true"><path d="M21 7H1.6M7.4 1.2 1.6 7l5.8 5.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="next" id="next" type="button" aria-label="Continue" aria-disabled="true">
+      <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="25.2" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M15.5 26h20.5M29.5 19.4 36 26l-6.5 6.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+
+    <!-- For screen readers: the same choice as four regions, plus the axis names in full. -->
+    <fieldset class="sr-only" id="regions">
+      <legend>How do you feel right now? Energy runs from low at the bottom to high at the top. Pleasantness runs from unpleasant on the left to pleasant on the right.</legend>
+      <label><input type="radio" name="region" value="high_unpleasant"> High energy, unpleasant</label>
+      <label><input type="radio" name="region" value="high_pleasant"> High energy, pleasant</label>
+      <label><input type="radio" name="region" value="low_unpleasant"> Low energy, unpleasant</label>
+      <label><input type="radio" name="region" value="low_pleasant"> Low energy, pleasant</label>
+    </fieldset>
+    <p class="sr-only" id="said" aria-live="polite"></p>
+  </main>
+
+  <script>
+  (() => {
+    'use strict';
+
+    // Starting values from the brief. Tune these on the phone.
+    const CFG = {
+      pitch: 7.25,        // CSS px between dots
+      cycle: 10,          // seconds in one seamless loop of the wave
+      lift: 3,            // CSS px the rows rise and fall
+      rowWave: 150,       // CSS px from one rising row to the next
+      sway: 16,           // CSS px the crest drifts either side of its resting line
+      flow: 0.85,         // length of the brightening that runs along the crest, as a share of the width
+      core: 12,           // CSS px half-width of the lavender band through the middle (it widens towards the left end)
+      spread: 160,        // CSS px half-width of the wide, faint swath of dots either side of it
+      spreadLight: 0.24,  // how bright that swath is, relative to the crest
+      sparkle: 0.45,      // how much single dots on the crest differ from their neighbours
+      base: 0.032,        // brightness of an ordinary dot (0 to 1)
+      swell: 0.9,         // how much a slow swell through the whole field lifts the ordinary dots
+      swellWave: 250,     // CSS px between swells
+      band: 0.82,         // extra brightness at the crest
+      dot: 0.78,          // CSS px dot diameter
+      dotGrow: 0.5,       // extra diameter at the crest
+      idleFps: 30,        // the resting wave is slow, so it draws at half rate
+      ripple: 0.65,       // seconds for the ripple from a tap
+      rippleReach: 230,   // CSS px the ring travels
+      colours: [[100, 108, 128], [158, 155, 182], [196, 186, 255]], // blue-grey, slate-lavender, the brief vivid lavender of a touch
+      bg: [13, 14, 19],
+      haze: [126, 112, 196], // the faint lavender light lying under the crest, between the dots
+      hazeAlpha: 0.014,
+      hazeWidth: 46          // CSS px half-width of that light
+    };
+    Object.assign(CFG, window.WAVE_CFG || {}); // lets a test page try other values
+    const TAU = Math.PI * 2;
+    // Tests can step time exactly; on a phone this is just the normal clock.
+    const testClock = typeof window.WAVE_CLOCK === 'function';
+    const clock = () => (testClock ? window.WAVE_CLOCK() : performance.now());
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const lerp = (a, b, k) => a + (b - a) * k;
+    const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+
+    const wave = document.getElementById('wave'), canvas = document.getElementById('field'), hit = document.getElementById('hit');
+    const halo = document.getElementById('halo'), next = document.getElementById('next'), back = document.getElementById('back');
+    const said = document.getElementById('said'), radios = [...document.querySelectorAll('input[name=region]')];
+    const axis = { high: document.querySelector('.axis-high'), low: document.querySelector('.axis-low'), left: document.querySelector('.axis-left') };
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const NAMES = { high_unpleasant: 'High energy, unpleasant', high_pleasant: 'High energy, pleasant', low_unpleasant: 'Low energy, unpleasant', low_pleasant: 'Low energy, pleasant' };
+
+    // ---------- the dot grid ----------
+    let W = 0, H = 0, dpr = 1, N = 0;
+    let bx, by, vig, env, coreW, jit, lineY, lineCos, out;
+    let yTop = 0, yMid = 0, yBot = 0;
+    // The crest's resting line, fitted to the mockup: a quarter of the way down at the left edge, through the
+    // middle, levelling off two-thirds of the way down at the right.
+    const crestV = u => 0.2524 + u * (0.3487 + u * (0.5657 - 0.5496 * u));
+    const crestY = x => H * crestV(clamp(x / W, 0, 1));
+    const crestSlope = x => { const u = clamp(x / W, 0, 1); return (H / W) * (0.3487 + u * (1.1314 - 1.6488 * u)); };
+    // Brightest just right of centre, dimmer towards both ends.
+    const crestLight = u => 0.36 + 0.64 * Math.exp(-Math.pow((u - 0.55) / 0.27, 2));
+    // Broad and soft at the left end, narrow through the middle, a little wider again at the right.
+    const crestWidth = u => CFG.core + 26 * (1 - smooth(-0.1, 0.38, u)) + 12 * smooth(0.72, 1, u);
+
+    function build() {
+      const box = wave.getBoundingClientRect();
+      W = box.width; H = box.height;
+      dpr = Math.min(3, window.devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+      const cols = Math.ceil(W / CFG.pitch) + 1, rows = Math.ceil(H / CFG.pitch) + 1;
+      const x0 = (W - (cols - 1) * CFG.pitch) / 2, y0 = (H - (rows - 1) * CFG.pitch) / 2;
+      N = cols * rows;
+      bx = new Float32Array(N); by = new Float32Array(N); vig = new Float32Array(N); env = new Float32Array(N); coreW = new Float32Array(N); jit = new Float32Array(N);
+      lineY = new Float32Array(N); lineCos = new Float32Array(N); out = new Float32Array(N * 5);
+      let i = 0;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++, i++) {
+        const x = x0 + c * CFG.pitch, y = y0 + r * CFG.pitch, u = x / W, v = y / H;
+        bx[i] = x; by[i] = y;
+        // Dots fade into the background towards the top and bottom, and a little at the sides.
+        vig[i] = smooth(0.03, 0.17, v) * smooth(0.9, 0.74, v) * smooth(-0.05, 0.07, u) * smooth(1.05, 0.93, u);
+        // A fixed, gentle unevenness, so the brightest dots sparkle rather than glow as a block.
+        const h = Math.sin(c * 12.9898 + r * 78.233) * 43758.5453; jit[i] = 1 + CFG.sparkle * ((h - Math.floor(h)) - 0.5) * 2;
+        env[i] = crestLight(clamp(u, 0, 1));
+        coreW[i] = crestWidth(clamp(u, 0, 1));
+        lineY[i] = crestY(x);
+        lineCos[i] = 1 / Math.sqrt(1 + Math.pow(crestSlope(x), 2));
+      }
+      // Energy is read between the HIGH and LOW labels, with its midpoint on the line of the side labels.
+      const top = wave.getBoundingClientRect().top, mid = r => (r.top + r.bottom) / 2 - top;
+      yTop = mid(axis.high.getBoundingClientRect()); yBot = mid(axis.low.getBoundingClientRect()); yMid = mid(axis.left.getBoundingClientRect());
+      renderer.resize();
+      if (marker) placeHalo();
+      draw(clock());
+    }
+
+    // ---------- choosing ----------
+    let marker = null, selection = null, dragging = false, pointer = null, tapAt = -1e9, glow = 0;
+    function selectionAt(x, y) {
+      const pleasant = clamp(x / W, 0, 1);
+      const energy = y <= yMid ? clamp(0.5 + 0.5 * (yMid - y) / Math.max(1, yMid - yTop), 0, 1)
+                               : clamp(0.5 - 0.5 * (y - yMid) / Math.max(1, yBot - yMid), 0, 1);
+      // Mood Meter cells, 1 to 10, so the next screen can pick words exactly as before.
+      const cellX = clamp(Math.floor(pleasant * 10) + 1, 1, 10), cellY = clamp(Math.floor(energy * 10) + 1, 1, 10);
+      return { pleasant, energy, x: cellX, y: cellY, quadrant: `${cellY >= 6 ? 'high' : 'low'}_${cellX >= 6 ? 'pleasant' : 'unpleasant'}` };
+    }
+    function choose(x, y, ripple) {
+      marker = { x: clamp(x, 0, W), y: clamp(y, 0, H) };
+      if (ripple && !motion.matches) tapAt = clock();
+      const next_ = selectionAt(marker.x, marker.y), changed = !selection || selection.quadrant !== next_.quadrant;
+      if (changed) {
+        said.textContent = NAMES[next_.quadrant];
+        radios.forEach(r => { r.checked = r.value === next_.quadrant; });
+        if (selection && dragging) buzz(7); // a small tick when a drag crosses into another region
+      }
+      selection = next_;
+      window.moodSelection = selection;
+      next.classList.add('on'); next.setAttribute('aria-disabled', 'false');
+      placeHalo();
+      wake();
+    }
+    function clearChoice() {
+      marker = null; selection = null; window.moodSelection = null;
+      next.classList.remove('on'); next.setAttribute('aria-disabled', 'true');
+      radios.forEach(r => { r.checked = false; });
+      halo.style.opacity = '0';
+      said.textContent = '';
+      wake();
+    }
+    function placeHalo() {
+      if (!marker) return;
+      const lifted = dragging && !motion.matches;
+      halo.classList.toggle('now', lifted); // appears at once under the finger, eases down after release
+      halo.style.transform = `translate(${marker.x}px,${marker.y}px) scale(${lifted ? 1.2 : 0.85})`;
+      halo.style.opacity = lifted ? '1' : '.75';
+    }
+    function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {} }
+    const local = e => { const r = wave.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+
+    hit.addEventListener('pointerdown', e => {
+      if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      pointer = e.pointerId; dragging = true; glow = motion.matches ? 0 : 1; // with reduced motion the marker keeps one steady size
+      try { hit.setPointerCapture(e.pointerId); } catch (_) {}
+      buzz(5);
+      choose(...local(e), true); // the ripple belongs to the first touch only
+    });
+    hit.addEventListener('pointermove', e => { if (e.pointerId === pointer && dragging) choose(...local(e), false); });
+    const release = e => { if (e.pointerId !== pointer) return; pointer = null; dragging = false; placeHalo(); wake(); };
+    hit.addEventListener('pointerup', release);
+    hit.addEventListener('pointercancel', release);
+    hit.addEventListener('contextmenu', e => e.preventDefault());
+
+    radios.forEach(radio => radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      const [energy, feel] = radio.value.split('_');
+      const x = W * (feel === 'pleasant' ? 0.75 : 0.25), y = energy === 'high' ? (yTop + yMid) / 2 : (yMid + yBot) / 2;
+      choose(x, y, true);
+    }));
+    next.addEventListener('click', () => {
+      if (!selection) return;
+      // The word screen is parked for now: this is where it will open, for selection.quadrant.
+      next.classList.add('pressed');
+      setTimeout(() => next.classList.remove('pressed'), 160);
+      wave.dispatchEvent(new CustomEvent('mood:continue', { detail: selection }));
+    });
+    back.addEventListener('click', clearChoice);
+
+    // ---------- each frame: where every dot is, how bright, how lavender ----------
+    let lastFrame = 0, started = clock(), frameSway = 0, framePhase = 0;
+    function compute(now) {
+      const still = motion.matches;
+      const phase = still ? 0.18 : (((now - started) / 1000) % CFG.cycle) / CFG.cycle;
+      const sway = CFG.sway * Math.sin(TAU * phase), flowL = CFG.flow * W;
+      frameSway = sway; framePhase = phase;
+      const haze2 = CFG.spread * CFG.spread, row2 = CFG.rowWave * 4.5;
+      const age = (now - tapAt) / 1000, rippling = age >= 0 && age < CFG.ripple;
+      const k = age / CFG.ripple, ringR = 14 + CFG.rippleReach * k, ringW = 9 + 26 * k, ringFade = (1 - k) * (1 - k), clusterFade = Math.exp(-age / 0.25);
+      const rs = lerp(11, 26, glow), rb = lerp(34, 62, glow), ga = lerp(0.72, 0.82, glow), gb = lerp(0.16, 0.28, glow);
+      const rs2 = rs * rs, rb2 = rb * rb, mx = marker ? marker.x : 0, my = marker ? marker.y : 0;
+      for (let i = 0, o = 0; i < N; i++, o += 5) {
+        const x = bx[i], y = by[i];
+        const d = (y - lineY[i] - sway) * lineCos[i], d2 = d * d;
+        const crest = 0.85 * Math.exp(-d2 / (coreW[i] * coreW[i])) + CFG.spreadLight * Math.exp(-d2 / haze2);
+        // A slow swell runs through the whole field, parallel to the crest, so even the faint dots rise and dim in turn.
+        const swell = 0.5 + 0.5 * Math.cos(TAU * (d / CFG.swellWave - phase));
+        const flowing = 0.55 + 0.45 * (0.5 + 0.5 * Math.cos(TAU * (x / flowL - phase)));
+        const band = crest * env[i] * flowing * jit[i];
+        const rise = still ? 0 : Math.sin(TAU * (y / CFG.rowWave + x / row2 - phase));
+        let alpha = vig[i] * (CFG.base * (1 - CFG.swell * 0.5 + CFG.swell * swell) + CFG.band * band) * (1 + 0.3 * rise);
+        let warm = Math.min(1, band * 1.25), size = CFG.dot + CFG.dotGrow * Math.min(1, band);
+        if (marker) {
+          const dx = x - mx, dy = y - my, r2 = dx * dx + dy * dy;
+          let lit = ga * Math.exp(-r2 / rs2) + gb * Math.exp(-r2 / rb2);
+          if (rippling) {
+            const r = Math.sqrt(r2), off = r - ringR;
+            lit += 1.1 * Math.exp(-r2 / 324) * clusterFade + 1.05 * Math.exp(-(off * off) / (ringW * ringW)) * ringFade / (1 + r / 110);
+          }
+          if (lit > 0.003) {
+            alpha += lit * (1 - 0.35 * alpha);
+            warm = Math.max(warm, 1 + Math.min(1, lit));
+            size += 1.1 * Math.min(1, lit);
+          }
+        }
+        out[o] = x; out[o + 1] = y - CFG.lift * rise; out[o + 2] = size; out[o + 3] = Math.min(1, alpha); out[o + 4] = warm;
+      }
+      return rippling;
+    }
+
+    // ---------- drawing: WebGL points, or plain canvas if WebGL is missing ----------
+    const renderer = (() => {
+      const gl = canvas.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: true, powerPreference: 'low-power' });
+      if (gl) {
+        const vs = `attribute vec2 aPos;attribute float aSize;attribute float aAlpha;attribute float aWarm;
+          uniform vec2 uView;uniform float uDpr;varying float vAlpha;varying float vWarm;varying float vPx;
+          void main(){gl_Position=vec4(aPos.x/uView.x*2.0-1.0,1.0-aPos.y/uView.y*2.0,0.0,1.0);
+            vPx=aSize*uDpr;gl_PointSize=vPx+1.5;vAlpha=aAlpha;vWarm=aWarm;}`;
+        const fs = `precision mediump float;varying float vAlpha;varying float vWarm;varying float vPx;
+          uniform vec3 uC0;uniform vec3 uC1;uniform vec3 uC2;
+          void main(){float r=length(gl_PointCoord*2.0-1.0)*(vPx+1.5)*0.5;
+            float a=vAlpha*(1.0-smoothstep(vPx*0.5-0.6,vPx*0.5+0.6,r));
+            vec3 c=vWarm<1.0?mix(uC0,uC1,vWarm):mix(uC1,uC2,vWarm-1.0);
+            gl_FragColor=vec4(c*a,a);}`;
+        const shader = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+        try {
+          const prog = gl.createProgram();
+          gl.attachShader(prog, shader(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(prog);
+          if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+          gl.useProgram(prog);
+          const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+          const attr = (name, size, offset) => { const loc = gl.getAttribLocation(prog, name); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 20, offset); };
+          attr('aPos', 2, 0); attr('aSize', 1, 8); attr('aAlpha', 1, 12); attr('aWarm', 1, 16);
+          const uView = gl.getUniformLocation(prog, 'uView'), uDpr = gl.getUniformLocation(prog, 'uDpr');
+          // The faint light under the crest: a full-screen pass that follows the same line and the same drift.
+          const hvs = 'attribute vec2 aQ;void main(){gl_Position=vec4(aQ,0.0,1.0);}';
+          const hfs = `precision mediump float;uniform vec2 uView;uniform float uDpr;uniform float uSway;uniform float uPhase;
+            uniform vec3 uHaze;uniform float uA;uniform float uW;
+            void main(){vec2 p=vec2(gl_FragCoord.x,uView.y*uDpr-gl_FragCoord.y)/uDpr;float u=clamp(p.x/uView.x,0.0,0.999);float v=p.y/uView.y;
+              float line=uView.y*(0.2524+u*(0.3487+u*(0.5657-0.5496*u)))+uSway;float slope=(uView.y/uView.x)*(0.3487+u*(1.1314-1.6488*u));
+              float d=(p.y-line)/sqrt(1.0+slope*slope);float env=0.36+0.64*exp(-pow((u-0.55)/0.27,2.0));
+              float vig=smoothstep(0.03,0.17,v)*smoothstep(0.9,0.74,v);
+              float flowing=0.6+0.4*(0.5+0.5*cos(6.2831853*(p.x/(0.85*uView.x)-uPhase)));
+              float a=uA*exp(-d*d/(uW*uW))*env*vig*flowing;gl_FragColor=vec4(uHaze*a,a);}`;
+          const hprog = gl.createProgram();
+          gl.attachShader(hprog, shader(gl.VERTEX_SHADER, hvs)); gl.attachShader(hprog, shader(gl.FRAGMENT_SHADER, hfs)); gl.linkProgram(hprog);
+          if (!gl.getProgramParameter(hprog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(hprog));
+          const quad = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, quad); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+          const hq = gl.getAttribLocation(hprog, 'aQ');
+          const hu = name => gl.getUniformLocation(hprog, name);
+          const hView = hu('uView'), hDpr = hu('uDpr'), hSway = hu('uSway'), hPhase = hu('uPhase');
+          gl.useProgram(hprog);
+          gl.uniform3f(hu('uHaze'), CFG.haze[0] / 255, CFG.haze[1] / 255, CFG.haze[2] / 255); gl.uniform1f(hu('uA'), CFG.hazeAlpha); gl.uniform1f(hu('uW'), CFG.hazeWidth);
+          gl.useProgram(prog); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+          CFG.colours.forEach((c, n) => gl.uniform3f(gl.getUniformLocation(prog, 'uC' + n), c[0] / 255, c[1] / 255, c[2] / 255));
+          gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+          gl.clearColor(CFG.bg[0] / 255, CFG.bg[1] / 255, CFG.bg[2] / 255, 1);
+          let capacity = 0;
+          return {
+            kind: 'webgl',
+            resize() {
+              gl.viewport(0, 0, canvas.width, canvas.height);
+              gl.useProgram(hprog); gl.uniform2f(hView, W, H); gl.uniform1f(hDpr, dpr);
+              gl.useProgram(prog); gl.uniform2f(uView, W, H); gl.uniform1f(uDpr, dpr);
+            },
+            draw() {
+              gl.clear(gl.COLOR_BUFFER_BIT);
+              gl.useProgram(hprog); gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+              gl.enableVertexAttribArray(hq); gl.vertexAttribPointer(hq, 2, gl.FLOAT, false, 0, 0);
+              gl.uniform1f(hSway, frameSway); gl.uniform1f(hPhase, framePhase);
+              gl.drawArrays(gl.TRIANGLES, 0, 3);
+              gl.disableVertexAttribArray(hq);
+              gl.useProgram(prog); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+              ['aPos', 'aSize', 'aAlpha', 'aWarm'].forEach(name => gl.enableVertexAttribArray(gl.getAttribLocation(prog, name)));
+              attr('aPos', 2, 0); attr('aSize', 1, 8); attr('aAlpha', 1, 12); attr('aWarm', 1, 16);
+              if (out.length > capacity) { gl.bufferData(gl.ARRAY_BUFFER, out, gl.DYNAMIC_DRAW); capacity = out.length; }
+              else gl.bufferSubData(gl.ARRAY_BUFFER, 0, out);
+              gl.drawArrays(gl.POINTS, 0, N);
+            }
+          };
+        } catch (_) { /* fall through to plain canvas */ }
+      }
+      const ctx = canvas.getContext('2d');
+      const bg = `rgb(${CFG.bg.join(',')})`, [c0, c1, c2] = CFG.colours;
+      return {
+        kind: '2d',
+        resize() { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); },
+        draw() {
+          ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+          for (let i = 0, o = 0; i < N; i++, o += 5) {
+            const a = out[o + 3]; if (a < 0.012) continue;
+            const w = out[o + 4], [p, q, k] = w < 1 ? [c0, c1, w] : [c1, c2, w - 1], s = out[o + 2];
+            ctx.fillStyle = `rgba(${Math.round(lerp(p[0], q[0], k))},${Math.round(lerp(p[1], q[1], k))},${Math.round(lerp(p[2], q[2], k))},${a.toFixed(3)})`;
+            ctx.fillRect(out[o] - s / 2, out[o + 1] - s / 2, s, s);
+          }
+        }
+      };
+    })();
+    wave.dataset.renderer = renderer.kind;
+
+    function draw(now) {
+      const target = dragging && !motion.matches ? 1 : 0;
+      glow = motion.matches ? 0 : lerp(glow, target, 0.18);
+      const busy = compute(now) || (dragging && !motion.matches) || Math.abs(glow - target) > 0.01;
+      renderer.draw();
+      return busy;
+    }
+    // The wave always moves at rest, at half rate; touches draw at full rate. Nothing runs while the app is hidden.
+    let raf = 0, busy = false;
+    function loop(now) {
+      raf = requestAnimationFrame(loop);
+      if (!busy && now - lastFrame < 1000 / CFG.idleFps - 2) return;
+      lastFrame = now;
+      busy = draw(now);
+      if (motion.matches && !busy) { cancelAnimationFrame(raf); raf = 0; } // still field: draw only when something changes
+    }
+    function wake() { busy = true; if (!raf && !document.hidden && !testClock) raf = requestAnimationFrame(loop); }
+    if (testClock) window.__waveFrame = () => draw(clock());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { cancelAnimationFrame(raf); raf = 0; }
+      else wake();
+    });
+    motion.addEventListener && motion.addEventListener('change', wake);
+
+    // ---------- fitting the screen ----------
+    const vv = window.visualViewport;
+    function fit() {
+      const usable = vv && Math.abs(vv.scale - 1) < 0.01;
+      document.documentElement.style.setProperty('--app-h', (usable ? vv.height : window.innerHeight) + 'px');
+      document.documentElement.style.setProperty('--app-top', (usable ? Math.max(0, vv.offsetTop) : 0) + 'px');
+      requestAnimationFrame(() => {
+        const old = selection && { ...selection };
+        build();
+        if (old) { // keep the same feeling after a rotation or resize, not the same pixel
+          const y = old.energy >= 0.5 ? yMid - (old.energy - 0.5) / 0.5 * (yMid - yTop) : yMid + (0.5 - old.energy) / 0.5 * (yBot - yMid);
+          choose(old.pleasant * W, y, false);
+        }
+      });
+    }
+    if (vv) vv.addEventListener('resize', fit);
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', () => setTimeout(fit, 250));
+    const go = () => { fit(); wake(); };
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(go); else go();
+  })();
+  </script>
+</body>
+</html>

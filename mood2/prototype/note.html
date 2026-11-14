@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#101116">
+  <title>Mood check-in · screen three</title>
+  <style>
+    /* The font is cut down to the few letters the screens use, so it is a few kilobytes. */
+    @font-face{font-family:"Geist Mono";src:url(geist-mono-ui.woff2) format("woff2");font-weight:100 900;font-display:block}
+    :root{
+      --bg:#101116;          /* graphite */
+      --label:#B0B1B3;       /* silver-grey */
+      --dim:#505157;         /* the forward arrow before a choice */
+      --lavender:#ABA4DF;    /* the forward arrow after a choice */
+      --safe-t:env(safe-area-inset-top,0px);
+      --safe-b:env(safe-area-inset-bottom,0px);
+      --safe-l:env(safe-area-inset-left,0px);
+      --safe-r:env(safe-area-inset-right,0px);
+      color-scheme:dark;
+      -webkit-text-size-adjust:100%;
+      text-size-adjust:100%;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+    body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+    button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    :focus-visible{outline:1.5px solid var(--label);outline-offset:4px}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+    /* The whole screen is the field. app-h follows the visible part of the screen. */
+    .heart{position:fixed;left:0;top:var(--app-top,0px);width:100%;height:var(--app-h,100dvh);overflow:hidden;background:var(--bg);touch-action:none}
+    .field{position:absolute;inset:0;width:100%;height:100%;display:block}
+    .hit{position:absolute;inset:0;touch-action:none;cursor:crosshair}
+
+
+    .back{position:absolute;z-index:3;top:calc(var(--safe-t) + 2px);left:calc(var(--safe-l) + 6px);width:52px;height:46px;display:grid;place-items:center;color:var(--label)}
+    .back svg{width:22px;height:14px}
+    .next{position:absolute;z-index:3;right:calc(var(--safe-r) + 12px);bottom:calc(var(--safe-b) + 14px);width:61px;height:61px;display:grid;place-items:center;color:var(--dim);transition:color .3s ease,transform .15s ease}
+    .next svg{width:52px;height:52px;overflow:visible}
+    .next.on{color:var(--lavender)}
+    .next.on:active{transform:scale(.95)}
+    .next.pressed{transform:scale(.93)}
+    @media (prefers-reduced-motion:reduce){.next{transition:none!important}}
+    .heart.off{visibility:hidden;pointer-events:none}
+  
+    /* screen three: a flat grey block on the still grid. Its edges sit on the lines between dots. */
+    .nblock{position:absolute;z-index:2;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;
+      padding:calc(var(--pk,3) * var(--p,6.44px));background:#1a1b21;border:1px solid #2a2b33;
+      font-family:"Geist Mono",ui-monospace,"Roboto Mono",monospace;font-weight:400;font-size:var(--fs,13px);line-height:calc(var(--lk,3.5) * var(--p,6.44px));
+      letter-spacing:.09em;text-transform:uppercase;color:var(--label)}
+    .nblock:focus-within{border-color:#3d3e49}
+    .nblock p{margin:0;flex:none}
+    .nblock .nl1{color:var(--ink,#E2E0F4)}
+    .nblock .nl2{color:#E2E0F4;margin-top:calc(var(--lk,3.5) * var(--p,6.44px))}
+    .nrule{flex:none;height:1px;background:#2a2b33;margin:calc(var(--lk,3.5) * var(--p,6.44px)) 0 calc(var(--pk,3) * var(--p,6.44px))}
+    .notebox{flex:1 1 auto;min-height:calc(2 * var(--lk,3.5) * var(--p,6.44px));width:100%;resize:none;margin:0;padding:0;border:0;border-radius:0;background:transparent;
+      color:#B0B1B3;caret-color:var(--lavender);caret-shape:block;font:inherit;letter-spacing:inherit;text-transform:inherit;line-height:inherit;
+      overflow-y:auto;outline:none;-webkit-appearance:none;appearance:none;touch-action:pan-y;-webkit-user-select:text;user-select:text;scrollbar-width:none}
+    .notebox::-webkit-scrollbar{display:none}
+    .notebox::placeholder{color:#505157;opacity:1}
+    .notebox:focus-visible{outline:none}
+    .probe{position:absolute;left:0;top:0;width:0;height:0;visibility:hidden;padding:var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l)}
+    /* After saving: the note is locked, the dots go, and a small label with a padlock says so. A save that failed shows its reason in the same place. */
+    .nsaved{position:absolute;z-index:2;box-sizing:border-box;display:flex;align-items:center;gap:9px;margin:0;font-family:"Geist Mono",ui-monospace,"Roboto Mono",monospace;font-weight:400;
+      font-size:11.2px;line-height:16px;letter-spacing:.09em;text-transform:uppercase;color:var(--lavender);visibility:hidden;pointer-events:none}
+    .nsaved svg{flex:none;width:11px;height:13px}
+    .nsaved.bad{color:#F45C54}
+    .nsaved.bad svg{display:none}
+    .note.saved .nsaved,.note.warn .nsaved{visibility:visible}
+    .note.saved .nblock{pointer-events:none;border-color:#2a2b33}
+    .note.saved .notebox{color:#6c6d75;caret-color:transparent}
+    .note.saved .notebox::placeholder{color:transparent}
+    .note.saved .back,.note.saved .next{visibility:hidden;pointer-events:none}
+  </style>
+</head>
+<body>
+  <main class="heart note" id="note">
+    <canvas class="field" id="nfield" aria-hidden="true"></canvas>
+    <div class="hit" id="nhit" aria-hidden="true" style="cursor:default"></div>
+    <div class="probe" id="nprobe" aria-hidden="true"></div>
+
+    <section class="nblock" id="nblock" aria-label="Check-in summary and note">
+      <p class="nl1" id="nl1"></p>
+      <p class="nl2" id="nl2"></p>
+      <div class="nrule" aria-hidden="true"></div>
+      <label class="sr-only" for="ntext">Note</label>
+      <textarea class="notebox" id="ntext" rows="3" maxlength="400" placeholder="Add a note" autocomplete="off" autocapitalize="sentences" spellcheck="false"></textarea>
+    </section>
+    <p class="nsaved" id="nsaved" role="status" aria-live="polite"><svg viewBox="0 0 11 13" aria-hidden="true"><rect x=".6" y="5.4" width="9.8" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M2.8 5.4V3.7a2.7 2.7 0 0 1 5.4 0v1.7" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/></svg><span id="nsavedtext"></span></p>
+
+    <button class="back" id="nback" type="button" aria-label="Back">
+      <svg viewBox="0 0 22 14" aria-hidden="true"><path d="M21 7H1.6M7.4 1.2 1.6 7l5.8 5.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="next on" id="nnext" type="button" aria-label="Save">
+      <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="25.2" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M15.5 26h20.5M29.5 19.4 36 26l-6.5 6.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </main>
+
+  <script>
+  (() => {
+    'use strict';
+
+    // Starting values. Tune these on the phone.
+    const CFG = {
+      // the grid: the same field of small dots as the other screens. Here it stays still and dull, and is drawn once.
+      columns: 64, minPitch: 5.2, maxPitch: 7.2, dot: 1.15, dotVary: 0.22,
+      colour: [112, 114, 140], pale: [226, 224, 244], bg: [16, 17, 22],
+      gold: [245, 196, 104], red: [244, 92, 84], blue: [122, 146, 255], mint: [108, 230, 174], blendSharp: 2,
+      moodMix: 0.18,       // how much white goes into the colour of the first sentence
+      // the block, in grid cells. Its edges sit halfway between dots.
+      blockSide: 4.5,      // cells of dots left on each side
+      centre: 0.47,        // where the middle of the block sits, as a share of the screen height (a little above the middle)
+      noteCells: 30,       // how tall the note area likes to be
+      noteMinLines: 3,     // the note never gets shorter than this unless the screen is tiny
+      topGap: 56, bottomGap: 92, // room kept for the back arrow and the save arrow
+      // text size, line height and padding (in cells), tried in order until everything fits. 11.2 is the size of the labels on screen one.
+      sizes: [[13, 3.5, 3], [11.2, 3.5, 3], [10, 3, 2]],
+      // the saved sequence: the dots brighten, hold, then drain away toward the block. Seconds.
+      brighten: 0.55, hold: 0.2, wave: 0.5, fade: 0.5, brightGrow: 0.3,
+      seed: 0
+    };
+    Object.assign(CFG, window.HEART_CFG || {});
+    const testClock = typeof window.HEART_CLOCK === 'function';
+    const clock = () => (testClock ? window.HEART_CLOCK() : performance.now()) / 1000;
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    // The three questions, from 1 (bottom) to 5 (top). Edit the words here.
+    // Each phrase says whether it is good news (good) or bad news, which decides where a sentence says "but".
+    /*lanes:start*/
+    const ph = (t, good) => ({ t, good });
+    const LANES = [
+      { key: 'tension', name: 'Tension', words: [ph('very relaxed', 1), ph('relaxed', 1), ph('steady', 1), ph('a little tense', 0), ph('on edge', 0)] },
+      { key: 'focus',   name: 'Focus',   words: [ph("can't focus", 0), ph('distracted', 0), ph('focus is normal', 1), ph('focused', 1), ph('very focused', 1)] },
+      { key: 'speed',   name: 'Thinking', words: [ph('thinking is sluggish', 0), ph('thinking is slow', 0), ph('thinking is normal', 1), ph('thinking is fast', 1), ph('thoughts are racing', 0)] }
+    ];
+    /*lanes:end*/
+
+    // The sentence at the top. Phrases go in lane order. "but" is used once, where the news first flips between good and bad;
+    // later flips get ", and". When focus and thinking are both normal they share one clause.
+    /*compose:start*/
+    function compose(levels, cap = true) {
+      const cl = [];
+      levels.forEach((lv, j) => { if (lv) cl.push({ t: LANES[j].words[lv - 1].t, good: LANES[j].words[lv - 1].good, j }); });
+      if (levels[1] === 3 && levels[2] === 3) cl.splice(cl.findIndex(c => c.j === 1), 2, { t: 'focus and thinking are normal', good: 1, merged: true, j: 1 });
+      let out = '', but = false, prev = '';
+      cl.forEach((c, i) => {
+        if (!i) { out = c.t; return; }
+        const flip = c.good !== cl[i - 1].good, last = i === cl.length - 1;
+        let join;
+        if (flip && !but) { join = ' but'; but = true; }
+        else if (flip) join = ', and';
+        else if (last && !c.merged && prev !== ', and') join = ' and';
+        else join = ',';
+        out += join + ' ' + c.t; prev = join;
+      });
+      return cap ? out.charAt(0).toUpperCase() + out.slice(1) : out;
+    }
+    /*compose:end*/
+
+    const TAU = Math.PI * 2;
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const lerp = (a, b, k) => a + (b - a) * k;
+    const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+    // A small seeded random source, so a test can replay exactly the same heart.
+    let seedState = (CFG.seed || Math.floor(Math.random() * 4294967296)) >>> 0;
+    const rand = () => { seedState = (seedState + 0x6D2B79F5) >>> 0; let t = seedState; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const hashAt = (i, j, s) => { let h = Math.imul(i, 374761393) ^ Math.imul(j, 668265263) ^ Math.imul(s, 2147483647); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+    const vnoise = (x, y, s) => { // smooth noise from -1 to 1
+      const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+      const a = hashAt(xi, yi, s), b = hashAt(xi + 1, yi, s), c = hashAt(xi, yi + 1, s), d = hashAt(xi + 1, yi + 1, s);
+      return (lerp(lerp(a, b, u), lerp(c, d, u), v)) * 2 - 1;
+    };
+
+    // Colours are blended in OKLab, where a halfway colour looks halfway, so red to green never turns muddy.
+    const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    const gam = c => { c = clamp(c, 0, 1); return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055; };
+    const toLab = ([r, g, b]) => {
+      const R = lin(r), G = lin(g), B = lin(b);
+      const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B), m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B), s = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+      return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+    };
+    const fromLab = ([L, a, b]) => {
+      const l = Math.pow(L + 0.3963377774 * a + 0.2158037573 * b, 3), m = Math.pow(L - 0.1055613458 * a - 0.0638541728 * b, 3), s = Math.pow(L - 0.0894841775 * a - 1.2914855480 * b, 3);
+      return [gam(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), gam(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), gam(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s)];
+    };
+    const LAB = { pale: toLab(CFG.pale), hp: toLab(CFG.gold), hu: toLab(CFG.red), lu: toLab(CFG.blue), lp: toLab(CFG.mint) };
+
+
+    // Line one comes from the tap on screen one: x and y are cells 1 to 10, so five levels each way.
+    // "very" at the ends, "a little" next to the middle, nothing in between.
+    /*feeling:start*/
+    function feelingWord(v, plus, minus) {
+      const lv = Math.ceil(v / 2), word = v >= 6 ? plus : minus;
+      return (lv === 1 || lv === 5 ? 'very ' : lv === 3 ? 'a little ' : '') + word;
+    }
+    function feeling(x, y) { return 'Feeling ' + feelingWord(y, 'high energy', 'low energy') + ' and ' + feelingWord(x, 'pleasant', 'unpleasant') + '.'; }
+    /*feeling:end*/
+
+    const pad = document.getElementById('note'), canvas = document.getElementById('nfield'), hit = document.getElementById('nhit'), probe = document.getElementById('nprobe');
+    const block = document.getElementById('nblock'), l1 = document.getElementById('nl1'), l2 = document.getElementById('nl2');
+    const area = document.getElementById('ntext'), next = document.getElementById('nnext'), back = document.getElementById('nback');
+    const savedEl = document.getElementById('nsaved'), savedText = document.getElementById('nsavedtext');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    pad.dataset.renderer = '2d';
+
+    // ---------- state ----------
+    let sel = { x: 9, y: 8, pleasant: 0.85, energy: 0.8 }, lv = [3, 3, 3];
+    let W = 0, Hgt = 0, dpr = 1, P = 6, x0 = 0, y0 = 0, cols = 0, rows = 0;
+    let info = null, paused = false, isSaved = false, anim = null, animRaf = 0, warnTimer = 0;
+
+    // ---------- the colour of the first sentence: the colour picked on screen one ----------
+    function moodColour(pu, e) {
+      pu = clamp(pu, 0, 1); e = clamp(e, 0, 1);
+      const sh = CFG.blendSharp, w = [Math.pow((1 - pu) * e, sh), Math.pow(pu * e, sh), Math.pow((1 - pu) * (1 - e), sh), Math.pow(pu * (1 - e), sh)];
+      const tot = w[0] + w[1] + w[2] + w[3] || 1;
+      const q = [0, 1, 2].map(j => (w[0] * LAB.hu[j] + w[1] * LAB.hp[j] + w[2] * LAB.lu[j] + w[3] * LAB.lp[j]) / tot);
+      const rad = Math.hypot(pu - 0.5, e - 0.5) * 2 / Math.SQRT2, sat = 0.25 + 0.75 * smooth(0.05, 0.5, rad);
+      return fromLab([0, 1, 2].map(j => lerp(LAB.pale[j], q[j], sat))).map((v, i) => lerp(v, CFG.pale[i] / 255, CFG.moodMix));
+    }
+    const rgb = c => `rgb(${c.map(v => Math.round(v * 255)).join(',')})`;
+
+    // ---------- the two sentences ----------
+    const lines = () => [feeling(sel.x, sel.y), "I'm " + compose(lv, false) + '.'];
+
+    // ---------- the grid: dull and still, drawn once for each layout ----------
+    // The dots are worked out once per layout. Painting them again (for the saved sequence) reuses the same numbers.
+    let dots = { n: 0, x: null, y: null, r: null, v: null };
+    function buildDots() {
+      const xs = [], ys = [], rs = [], vs = [];
+      const snap = v => (Math.round(v * dpr - 0.5) + 0.5) / dpr;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+        const x = snap(x0 + c * P), y = snap(y0 + r * P), u = x / W, v = y / Hgt;
+        const vig = smooth(-0.01, 0.12, v) * smooth(1.01, 0.88, v) * smooth(-0.015, 0.06, u) * smooth(1.015, 0.94, u);
+        if (vig < 0.02) continue;
+        xs.push(x); ys.push(y); vs.push(vig); rs.push(CFG.dot * (1 + CFG.dotVary * (hashAt(c, r, 6) * 2 - 1)) / 2);
+      }
+      dots = { n: xs.length, x: Float32Array.from(xs), y: Float32Array.from(ys), r: Float32Array.from(rs), v: Float32Array.from(vs) };
+    }
+    // bright: 0 is the dull grid, 1 is pale. fade(i): how far dot i has drained away, 0 to 1 (null: none have).
+    function paint(bright, fade) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = `rgb(${CFG.bg.join(',')})`; ctx.fillRect(0, 0, W, Hgt);
+      ctx.fillStyle = `rgb(${CFG.colour.map((v, i) => Math.round(lerp(v, CFG.pale[i], bright))).join(',')})`;
+      const grow = 1 + CFG.brightGrow * bright;
+      for (let i = 0; i < dots.n; i++) {
+        const a = fade ? dots.v[i] * (1 - fade(i)) : dots.v[i];
+        if (a < 0.01) continue;
+        ctx.globalAlpha = a; ctx.beginPath(); ctx.arc(dots.x[i], dots.y[i], dots.r[i] * grow, 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+    function drawGrid() {
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(Hgt * dpr);
+      buildDots();
+      anim = null; cancelAnimationFrame(animRaf); animRaf = 0;
+      paint(0, isSaved ? () => 1 : null);   // a resize after saving keeps the dots gone
+    }
+
+    // ---------- the saved sequence ----------
+    // The dots brighten, hold a moment, then drain toward the block from the edges inward. The note is locked and a label says so.
+    function animStep() {
+      if (!anim) return;
+      const t = clock() - anim.t0, tb = clamp(t / CFG.brighten, 0, 1), bright = 1 - (1 - tb) * (1 - tb);
+      const t1 = CFG.brighten + CFG.hold;
+      if (t >= t1 + CFG.wave + CFG.fade) { anim.done = true; paint(bright, () => 1); return; }
+      paint(bright, t > t1 ? i => { const k = clamp((t - t1 - anim.delay[i]) / CFG.fade, 0, 1); return k * k * (3 - 2 * k); } : null);
+    }
+    function tick() { animStep(); animRaf = anim && !anim.done ? requestAnimationFrame(tick) : 0; }
+    function setLabel(text, bad) { savedText.textContent = text; savedEl.classList.toggle('bad', !!bad); }
+    function saved(text) {
+      if (isSaved) return;
+      isSaved = true; area.blur(); area.readOnly = true; area.setAttribute('aria-readonly', 'true');
+      clearTimeout(warnTimer); pad.classList.remove('warn');
+      setLabel(text || 'Saved', false); pad.classList.add('saved');
+      if (motion.matches || !info) { anim = null; paint(0, () => 1); return; }   // reduced motion: the dots are simply gone
+      const cx = (info.left + info.right) / 2, cy = (info.top + info.bottom) / 2, far = Math.hypot(Math.max(cx, W - cx), Math.max(cy, Hgt - cy)) || 1;
+      const delay = new Float32Array(dots.n);
+      for (let i = 0; i < dots.n; i++) delay[i] = (1 - Math.min(1, Math.hypot(dots.x[i] - cx, dots.y[i] - cy) / far)) * CFG.wave;
+      anim = { t0: clock(), delay, done: false };
+      if (testClock) animStep(); else animRaf = requestAnimationFrame(tick);
+    }
+    // A save that did not go through: the note stays open, and the reason shows under the block for a few seconds.
+    function error(text) {
+      if (isSaved) return;
+      setLabel(text, true); pad.classList.add('warn');
+      clearTimeout(warnTimer); warnTimer = setTimeout(() => pad.classList.remove('warn'), 6000);
+    }
+    area.addEventListener('input', () => { clearTimeout(warnTimer); pad.classList.remove('warn'); });
+
+    // ---------- the block: text size and height are chosen so everything fits above the save arrow ----------
+    function layout() {
+      const cs = getComputedStyle(probe), safeT = parseFloat(cs.paddingTop) || 0, safeB = parseFloat(cs.paddingBottom) || 0;
+      const X = c => x0 + c * P, Y = r => y0 + r * P;
+      const L = CFG.blockSide, R = (cols - 1) - CFG.blockSide;
+      pad.style.setProperty('--p', P + 'px');
+      pad.style.setProperty('--ink', rgb(moodColour(sel.pleasant, sel.energy)));
+      block.style.left = X(L) + 'px'; block.style.width = (R - L) * P + 'px';
+      const [a, b] = lines(); l1.textContent = a; l2.textContent = b;
+
+      const availTop = safeT + CFG.topGap, availBottom = Hgt - safeB - CFG.bottomGap;
+      const topMin = Y(Math.ceil((availTop - y0) / P + 0.5) - 0.5), bottomMax = Y(Math.floor((availBottom - y0) / P + 0.5) - 0.5), hbMax = bottomMax - topMin;   // the highest and lowest lines between dots the block may use
+      const noteIdeal = CFG.noteCells * P;
+      let fs = CFG.sizes[0][0], used = 0, lh = 3.5 * P, noteMin = 0;
+      for (const [size, lk, pk] of CFG.sizes) {
+        fs = size; lh = lk * P; noteMin = CFG.noteMinLines * lh;
+        block.style.setProperty('--fs', size + 'px'); block.style.setProperty('--lk', lk); block.style.setProperty('--pk', pk);
+        block.style.height = 'auto'; area.style.display = 'none';
+        used = block.offsetHeight;                              // everything except the note area: padding, border, both sentences and the rule
+        area.style.display = '';
+        if (used + noteMin <= hbMax) break;
+      }
+      const wanted = Math.ceil((used + noteIdeal) / P) * P, floor = Math.ceil((used + noteMin) / P) * P;
+      const hb = Math.min(Math.max(wanted, Math.min(floor, hbMax)), hbMax);   // a whole number of cells tall
+      const top = clamp(Y(Math.round((CFG.centre * Hgt - hb / 2 - y0) / P) - 0.5), topMin, bottomMax - hb);
+      block.style.height = hb + 'px'; block.style.top = top + 'px';
+      savedEl.style.left = X(L) + 'px'; savedEl.style.width = (R - L) * P + 'px'; savedEl.style.top = (top + hb + 2 * P) + 'px';
+      info = { fs, top, bottom: top + hb, left: X(L), right: X(R), hb, availTop, availBottom, P, x0, y0, W, H: Hgt };
+    }
+
+    function build() {
+      const box = pad.getBoundingClientRect();
+      W = box.width; Hgt = box.height; dpr = Math.min(3, window.devicePixelRatio || 1);
+      P = clamp(W / CFG.columns, CFG.minPitch, CFG.maxPitch);
+      cols = Math.ceil(W / P) + 1; rows = Math.ceil(Hgt / P) + 1;
+      x0 = (W - (cols - 1) * P) / 2; y0 = (Hgt - (rows - 1) * P) / 2;
+      drawGrid(); layout();
+    }
+
+    // ---------- touch and buttons ----------
+    hit.addEventListener('pointerdown', () => { if (document.activeElement === area) area.blur(); }); // a tap on the dots puts the keyboard away
+    next.addEventListener('click', () => {
+      if (isSaved) return;
+      next.classList.add('pressed'); setTimeout(() => next.classList.remove('pressed'), 160);
+      area.blur();
+      window.moodNote = { text: area.value.trim(), summary: lines().join(' ') };   // the note is saved exactly as typed; capitals are only how it is shown
+      pad.dispatchEvent(new CustomEvent('note:save', { detail: window.moodNote }));
+    });
+    back.addEventListener('click', () => { area.blur(); pad.dispatchEvent(new CustomEvent('note:back')); });
+
+    // ---------- showing and hiding ----------
+    function setSummary(s, p) {
+      if (s) sel = { x: s.x, y: s.y, pleasant: s.pleasant, energy: s.energy };
+      if (p) lv = [p.tension, p.focus, p.speed];
+    }
+    function show(s, p) { setSummary(s, p); paused = false; pad.classList.remove('off'); build(); }
+    function hide() { paused = true; area.blur(); pad.classList.add('off'); }
+    function reset() {
+      cancelAnimationFrame(animRaf); animRaf = 0; anim = null; isSaved = false;
+      clearTimeout(warnTimer); pad.classList.remove('saved', 'warn'); setLabel('', false);
+      area.readOnly = false; area.removeAttribute('aria-readonly'); area.value = ''; area.scrollTop = 0;
+    }
+    window.screenThree = { show, hide, reset, saved, error };
+
+    if (testClock) {
+      window.__noteFrame = () => { if (anim && !anim.done) animStep(); };     // nothing moves here until the check-in is saved
+      if (!window.__FLOW) window.__heartFrame = window.__noteFrame;
+      window.__note = () => {
+        const bb = block.getBoundingClientRect(), a = area.getBoundingClientRect(), r1 = l1.getBoundingClientRect(), r2 = l2.getBoundingClientRect();
+        const lr = savedEl.getBoundingClientRect();
+        return Object.assign({ saved: isSaved, label: savedText.textContent, labelVisible: getComputedStyle(savedEl).visibility === 'visible', labelRect: { top: lr.top, bottom: lr.bottom, left: lr.left, right: lr.right },
+          readOnly: area.readOnly, anim: anim ? { t: clock() - anim.t0, done: anim.done } : null, lines: lines(), renderer: '2d', blockRect: { top: bb.top, bottom: bb.bottom, left: bb.left, right: bb.right }, noteRect: { top: a.top, bottom: a.bottom, height: a.height },
+          summaryBottom: r2.bottom, summaryRight: Math.max(r1.right, r2.right), clipped: block.scrollHeight > block.clientHeight + 1 || l1.scrollWidth > l1.clientWidth + 1 || l2.scrollWidth > l2.clientWidth + 1,
+          textTransform: getComputedStyle(area).textTransform, lineHeight: parseFloat(getComputedStyle(l1).lineHeight) }, info);
+      };
+    }
+
+    const vv = window.visualViewport; let fitTimer = 0;
+    function fit(now) {
+      const usable = vv && Math.abs(vv.scale - 1) < 0.01;
+      document.documentElement.style.setProperty('--app-h', (usable ? vv.height : window.innerHeight) + 'px');
+      document.documentElement.style.setProperty('--app-top', (usable ? Math.max(0, vv.offsetTop) : 0) + 'px');
+      clearTimeout(fitTimer);
+      const run = () => requestAnimationFrame(() => { if (!paused) build(); });
+      if (now) run(); else fitTimer = setTimeout(run, 60); // the keyboard sliding up sends many resizes; lay out once it settles
+    }
+    if (vv) vv.addEventListener('resize', () => fit(false));
+    window.addEventListener('resize', () => fit(false));
+    window.addEventListener('orientationchange', () => setTimeout(() => fit(false), 250));
+
+    // Standalone, the page can be tried with ?x=9&y=8&t=5&f=4&s=1 (the tap on screen one, then tension, focus and thinking).
+    const params = new URLSearchParams(location.search), num = (k, d) => (params.has(k) ? +params.get(k) : d);
+    const x = num('x', 9), y = num('y', 8);
+    setSummary({ x, y, pleasant: (x - 0.5) / 10, energy: (y - 0.5) / 10 }, { tension: num('t', 5), focus: num('f', 4), speed: num('s', 1) });
+    if (window.__FLOW) { pad.classList.add('off'); paused = true; }
+    const px = () => `13px "Geist Mono"`;
+    const ready = document.fonts && document.fonts.load ? Promise.all([document.fonts.load(px()), document.fonts.ready]) : Promise.resolve();
+    ready.catch(() => {}).then(() => fit(true));
+  })();
+  </script>
+</body>
+</html>

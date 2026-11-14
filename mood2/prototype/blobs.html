@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#101116">
+  <title>Mood check-in · screen two</title>
+  <style>
+    /* The font is cut down to the few letters the screens use, so it is a few kilobytes. */
+    @font-face{font-family:"Geist Mono";src:url(geist-mono-ui.woff2) format("woff2");font-weight:100 900;font-display:block}
+    :root{
+      --bg:#101116;          /* graphite */
+      --label:#B0B1B3;       /* silver-grey */
+      --dim:#505157;         /* the forward arrow before a choice */
+      --lavender:#ABA4DF;    /* the forward arrow after a choice */
+      --safe-t:env(safe-area-inset-top,0px);
+      --safe-b:env(safe-area-inset-bottom,0px);
+      --safe-l:env(safe-area-inset-left,0px);
+      --safe-r:env(safe-area-inset-right,0px);
+      color-scheme:dark;
+      -webkit-text-size-adjust:100%;
+      text-size-adjust:100%;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+    body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+    button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    :focus-visible{outline:1.5px solid var(--label);outline-offset:4px}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+    /* The whole screen is the field. app-h follows the visible part of the screen. */
+    .heart{position:fixed;left:0;top:var(--app-top,0px);width:100%;height:var(--app-h,100dvh);overflow:hidden;background:var(--bg);touch-action:none}
+    .field{position:absolute;inset:0;width:100%;height:100%;display:block}
+    .hit{position:absolute;inset:0;touch-action:none;cursor:crosshair}
+
+
+    .back{position:absolute;z-index:3;top:calc(var(--safe-t) + 2px);left:calc(var(--safe-l) + 6px);width:52px;height:46px;display:grid;place-items:center;color:var(--label)}
+    .back svg{width:22px;height:14px}
+    .next{position:absolute;z-index:3;right:calc(var(--safe-r) + 12px);bottom:calc(var(--safe-b) + 14px);width:61px;height:61px;display:grid;place-items:center;color:var(--dim);transition:color .3s ease,transform .15s ease}
+    .next svg{width:52px;height:52px;overflow:visible}
+    .next.on{color:var(--lavender)}
+    .next.on:active{transform:scale(.95)}
+    .next.pressed{transform:scale(.93)}
+    @media (prefers-reduced-motion:reduce){.next{transition:none!important}}
+    .heart.off{visibility:hidden;pointer-events:none}
+  
+    /* screen two: the title and the three lanes */
+    .heart.off{visibility:hidden;pointer-events:none}
+    .title{position:absolute;left:0;right:0;top:calc(var(--safe-t) + 92px);margin:0;padding:0 26px;text-align:center;font-family:"Geist Mono",ui-monospace,"Roboto Mono",monospace;font-size:21px;line-height:1.4;font-weight:400;letter-spacing:-.015em;color:#E9E9EE;min-height:4.2em;pointer-events:none;text-wrap:balance}
+    .title span{display:inline;transition:opacity .22s ease}
+    @media (prefers-reduced-motion:reduce){.title span{transition:none}}
+  </style>
+</head>
+<body>
+  <main class="heart pad" id="pad">
+    <canvas class="field" id="pfield" aria-hidden="true"></canvas>
+    <div class="hit" id="phit" aria-hidden="true"></div>
+
+    <p class="title" id="ptitle" aria-live="polite"></p>
+
+    <button class="back" id="pback" type="button" aria-label="Back">
+      <svg viewBox="0 0 22 14" aria-hidden="true"><path d="M21 7H1.6M7.4 1.2 1.6 7l5.8 5.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="next" id="pnext" type="button" aria-label="Continue" aria-disabled="true">
+      <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="25.2" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M15.5 26h20.5M29.5 19.4 36 26l-6.5 6.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+
+    <!-- For screen readers: the same three questions as plain choices. -->
+    <div class="sr-only" id="pradios"></div>
+  </main>
+
+  <script>
+  (() => {
+    'use strict';
+
+    // Starting values. Tune these on the phone.
+    const CFG = {
+      // the grid: the same field of small dots as screen one
+      columns: 64, minPitch: 5.2, maxPitch: 7.2, dot: 1.15, dotVary: 0.22, litSize: 0.6,
+      colour: [112, 114, 140], pale: [226, 224, 244], bg: [16, 17, 22],
+      gold: [245, 196, 104], red: [244, 92, 84], blue: [122, 146, 255], mint: [108, 230, 174], blendSharp: 2,
+      // the blobs: small clouds of lit dots
+      radius: 0.12,         // blob size, as a share of the screen width
+      falloff: 1.8,         // how quickly a blob thins towards its edge (bigger = tighter)
+      amp: 1.7,             // strength of the blob you are about to place
+      quiet: 0.95,          // strength of blobs still waiting their turn
+      placedAmp: 1.15,      // strength of a blob once placed (the heartbeat lifts it from here)
+      edge: 0.1, twinkle: 0.1, rungGlow: 0.55, rungSize: 0.35,
+      fuzz: 0.28, fuzzIn: 0.14, fuzzOut: 0.7, maxShift: 2,   // how loosely the dots sit inside a blob, in gaps
+      drift: 0.4, driftSpeed: 0.8, driftIn: 0.35, driftOut: 0.9, // the slow wander of dots inside a blob
+      lowBpm: 28, highBpm: 60,   // heartbeat of a placed blob: slow at level 1, fast at level 5, like screen one
+      dub: 0.3, lubRise: 0.12, dubRise: 0.10, gapSlow: 0.46, gapFast: 0.34, pulse: 0.9, // the double beat, and how much it lifts the glow
+      tintShift: 0.75, tintFloor: 0.075,  // the three blobs are three shades of the colour you picked
+      // how the blobs move
+      spring: 9.5, damping: 0.5,   // how quickly a blob goes to its level, and how much it overshoots
+      hold: 16,                    // how closely a blob follows your finger
+      swim: 0.17,                  // how fast a free blob swims, as a share of the screen width per second
+      swimTurn: 0.8,               // how much its heading wanders, in radians per second
+      swimEase: 2.4,               // how quickly it settles into that drift
+      follow: 1.2,                 // how much its heading follows where it is actually going (carries it round another blob)
+      pushForce: 260, pushReach: 1.9,   // blobs push each other apart when they get close (force, reach in blob radii)
+      swirlForce: 150, swirlReach: 4.5, // and swirl round each other (force, reach in blob radii)
+      pullForce: 70, pullReach: 7,      // and are drawn back together from further away
+      bump: 3.5,                        // how much a passing blob nudges a placed one
+      flingMin: 400, flingHard: 1500, flingKick: 0.55, // px/s: a flick, a hard fling, and how much speed the blob keeps
+      stretchGain: 0.0009, stretchMax: 0.8, stretchSpring: 16, stretchDamp: 0.25, // the jelly
+      trailMin: 200, trailMax: 1000, trailFade: 0.3, trailAmp: 0.5,
+      calmFps: 30, activeFps: 60,
+      seed: 0
+    };
+    Object.assign(CFG, window.HEART_CFG || {});
+    const testClock = typeof window.HEART_CLOCK === 'function';
+    const clock = () => (testClock ? window.HEART_CLOCK() : performance.now()) / 1000;
+
+    // The three questions, from 1 (bottom) to 5 (top). Edit the words here.
+    // Each phrase says whether it is good news (good) or bad news, which decides where a sentence says "but".
+    /*lanes:start*/
+    const ph = (t, good) => ({ t, good });
+    const LANES = [
+      { key: 'tension', name: 'Tension', words: [ph('very relaxed', 1), ph('relaxed', 1), ph('steady', 1), ph('a little tense', 0), ph('on edge', 0)] },
+      { key: 'focus',   name: 'Focus',   words: [ph("can't focus", 0), ph('distracted', 0), ph('focus is normal', 1), ph('focused', 1), ph('very focused', 1)] },
+      { key: 'speed',   name: 'Thinking', words: [ph('thinking is sluggish', 0), ph('thinking is slow', 0), ph('thinking is normal', 1), ph('thinking is fast', 1), ph('thoughts are racing', 0)] }
+    ];
+    /*lanes:end*/
+
+    const TAU = Math.PI * 2;
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const lerp = (a, b, k) => a + (b - a) * k;
+    const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+    // A small seeded random source, so a test can replay exactly the same heart.
+    let seedState = (CFG.seed || Math.floor(Math.random() * 4294967296)) >>> 0;
+    const rand = () => { seedState = (seedState + 0x6D2B79F5) >>> 0; let t = seedState; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const hashAt = (i, j, s) => { let h = Math.imul(i, 374761393) ^ Math.imul(j, 668265263) ^ Math.imul(s, 2147483647); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+    const vnoise = (x, y, s) => { // smooth noise from -1 to 1
+      const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+      const a = hashAt(xi, yi, s), b = hashAt(xi + 1, yi, s), c = hashAt(xi, yi + 1, s), d = hashAt(xi + 1, yi + 1, s);
+      return (lerp(lerp(a, b, u), lerp(c, d, u), v)) * 2 - 1;
+    };
+
+    // Colours are blended in OKLab, where a halfway colour looks halfway, so red to green never turns muddy.
+    const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    const gam = c => { c = clamp(c, 0, 1); return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055; };
+    const toLab = ([r, g, b]) => {
+      const R = lin(r), G = lin(g), B = lin(b);
+      const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B), m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B), s = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+      return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+    };
+    const fromLab = ([L, a, b]) => {
+      const l = Math.pow(L + 0.3963377774 * a + 0.2158037573 * b, 3), m = Math.pow(L - 0.1055613458 * a - 0.0638541728 * b, 3), s = Math.pow(L - 0.0894841775 * a - 1.2914855480 * b, 3);
+      return [gam(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), gam(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), gam(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s)];
+    };
+    const LAB = { pale: toLab(CFG.pale), hp: toLab(CFG.gold), hu: toLab(CFG.red), lu: toLab(CFG.blue), lp: toLab(CFG.mint) };
+
+
+    const pad = document.getElementById('pad'), canvas = document.getElementById('pfield'), hit = document.getElementById('phit');
+    const next = document.getElementById('pnext'), back = document.getElementById('pback'), titleEl = document.getElementById('ptitle'), radioBox = document.getElementById('pradios');
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    // ---------- the dot grid ----------
+    let W = 0, Hgt = 0, dpr = 1, N = 0, P = 6, restD = 1, R = 40;
+    let bx, by, vig, th, nz, gx, gy, szv, tf, tp, fz, em, ecol, mv, dr, rung, out;
+    const yLevel = [0, 0, 0, 0, 0, 0], laneX = [0, 0, 0];
+    let wallTop = 0, wallBot = 0;
+    let dirty = true, paused = false;
+
+    function build() {
+      const box = pad.getBoundingClientRect();
+      W = box.width; Hgt = box.height;
+      dpr = Math.min(3, window.devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(Hgt * dpr);
+      P = clamp(W / CFG.columns, CFG.minPitch, CFG.maxPitch);
+      restD = CFG.dot; R = CFG.radius * W;
+      const cols = Math.ceil(W / P) + 1, rows = Math.ceil(Hgt / P) + 1;
+      const x0 = (W - (cols - 1) * P) / 2, y0 = (Hgt - (rows - 1) * P) / 2;
+      N = cols * rows;
+      bx = new Float32Array(N); by = new Float32Array(N); vig = new Float32Array(N); th = new Float32Array(N); nz = new Float32Array(N);
+      gx = new Float32Array(N); gy = new Float32Array(N); szv = new Float32Array(N); tf = new Float32Array(N); tp = new Float32Array(N);
+      fz = new Float32Array(N); em = new Float32Array(N); mv = new Float32Array(N); dr = new Float32Array(N * 8); rung = new Float32Array(N);
+      ecol = new Float32Array(N * 3); out = new Float32Array(N * 8);
+      const snap = v => (Math.round(v * dpr - 0.5) + 0.5) / dpr;
+      let i = 0;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++, i++) {
+        const x = snap(x0 + c * P), y = snap(y0 + r * P), u = x / W, v = y / Hgt;
+        bx[i] = x; by[i] = y;
+        vig[i] = smooth(-0.01, 0.12, v) * smooth(1.01, 0.88, v) * smooth(-0.015, 0.06, u) * smooth(1.015, 0.94, u);
+        th[i] = hashAt(c, r, 5);
+        nz[i] = vnoise(c / 6, r / 6, 17);
+        const u1 = Math.max(1e-6, hashAt(c, r, 3)), u2 = hashAt(c, r, 4), m = Math.sqrt(-2 * Math.log(u1));
+        gx[i] = clamp(m * Math.cos(TAU * u2), -2.4, 2.4); gy[i] = clamp(m * Math.sin(TAU * u2), -2.4, 2.4);
+        szv[i] = 1 + CFG.dotVary * (hashAt(c, r, 6) * 2 - 1);
+        tf[i] = (0.08 + 0.22 * hashAt(c, r, 8)) * TAU; tp[i] = hashAt(c, r, 9) * TAU;
+        for (let k = 0; k < 2; k++) {
+          dr[8 * i + 4 * k] = (k ? 1.7 : 0.8) + (k ? 1.2 : 0.7) * hashAt(c, r, 20 + k * 4);
+          dr[8 * i + 4 * k + 1] = hashAt(c, r, 21 + k * 4) * TAU;
+          dr[8 * i + 4 * k + 2] = (k ? 1.7 : 0.8) + (k ? 1.2 : 0.7) * hashAt(c, r, 22 + k * 4);
+          dr[8 * i + 4 * k + 3] = hashAt(c, r, 23 + k * 4) * TAU;
+        }
+      }
+      // Three lanes, five levels. Level 5 is the top rung, level 1 the bottom one.
+      for (let j = 0; j < 3; j++) laneX[j] = W * (2 * j + 1) / 6;
+      const top = Math.max(0.30 * Hgt, 92 + 4.2 * 21 + 62), bot = Hgt - Math.max(0.2 * Hgt, 150);
+      const step = Math.round((bot - top) / 4 / P) * P;
+      R = Math.min(CFG.radius * W, 0.5 * step); // on a short screen the blobs get smaller so neighbouring rungs stay apart
+      for (let l = 1; l <= 5; l++) yLevel[l] = bot - (l - 1) * step;
+      wallTop = yLevel[5] - 0.55 * R; wallBot = yLevel[1] + 0.55 * R;
+      // The rungs are rows of the same dot grid, a little brighter, one short segment per lane.
+      const laneW = W / 3;
+      for (let l = 1; l <= 5; l++) {
+        let row = 0, best = 1e9;
+        for (let k = 0; k < N; k++) { const d = Math.abs(by[k] - yLevel[l]); if (d < best) { best = d; row = by[k]; } }
+        yLevel[l] = row;
+        for (let k = 0; k < N; k++) {
+          if (Math.abs(by[k] - row) > 0.01) continue;
+          for (let j = 0; j < 3; j++) {
+            const t = Math.abs(bx[k] - laneX[j]) / (laneW * 0.4);
+            if (t < 1) rung[k] = Math.max(rung[k], (1 - smooth(0.7, 1, t)) * (l === 3 ? 1 : 0.8));
+          }
+        }
+      }
+      renderer.resize();
+      dirty = true;
+    }
+
+    // ---------- colours: three shades of the colour chosen on screen one ----------
+    const base = { pu: 0.8, e: 0.8 };
+    const tint = [[0.96, 0.77, 0.41], [0.96, 0.77, 0.41], [0.96, 0.77, 0.41]];
+    function setColour(pleasant, energy) {
+      base.pu = clamp(pleasant, 0, 1); base.e = clamp(energy, 0, 1);
+      const pu = base.pu, e = base.e, sh = CFG.blendSharp;
+      const w = [Math.pow((1 - pu) * e, sh), Math.pow(pu * e, sh), Math.pow((1 - pu) * (1 - e), sh), Math.pow(pu * (1 - e), sh)];
+      const tot = w[0] + w[1] + w[2] + w[3] || 1;
+      const q = [0, 1, 2].map(j => (w[0] * LAB.hu[j] + w[1] * LAB.hp[j] + w[2] * LAB.lu[j] + w[3] * LAB.lp[j]) / tot);
+      const rad = Math.hypot(pu - 0.5, e - 0.5) * 2 / Math.SQRT2;
+      const sat = 0.25 + 0.75 * smooth(0.05, 0.5, rad);
+      const lab = [0, 1, 2].map(j => lerp(LAB.pale[j], q[j], sat));
+      const C = Math.hypot(lab[1], lab[2]), h = Math.atan2(lab[2], lab[1]), C2 = Math.max(C, CFG.tintFloor);
+      const shade = dh => fromLab([lab[0], C2 * Math.cos(h + dh), C2 * Math.sin(h + dh)]);
+      tint[0] = fromLab(lab); tint[1] = shade(-CFG.tintShift); tint[2] = shade(CFG.tintShift);
+    }
+
+    // ---------- the blobs ----------
+    const hs = { last: null, dt: 0, dc: 0 };
+    let blobs = [], dragging = null, samples = [], lastTouch = -99, moving = 0;
+    function reset() {
+      blobs = LANES.map((l, j) => ({
+        x: W * (0.25 + 0.25 * j), y: lerp(yLevel[2], yLevel[4], [0.25, 0.8, 0.45][j]), vx: 0, vy: 0,
+        level: null, placed: 0, pending: false, held: false, holdY: 0,
+        s: 0, sv: 0, ux: 0, uy: -1, amp: CFG.quiet,
+        th: rand() * TAU, p1: rand() * TAU, p2: rand() * TAU, p3: rand() * TAU, ws: 0.8 + 0.5 * rand(), ws2: 0.8 + 0.5 * rand(), ph: rand() * TAU,
+        t0: 0, bpm: 41, gap: 0.4
+      }));
+      dragging = null; samples = [];
+      for (const r of radioBox.querySelectorAll('input')) r.checked = false;
+      showTitle(); dirty = true;
+    }
+    const firstUnset = () => blobs.findIndex(b => !b.placed);
+    const nearestLevel = y => { let best = 1, d = 1e9; for (let l = 1; l <= 5; l++) { const k = Math.abs(y - yLevel[l]); if (k < d) { d = k; best = l; } } return best; };
+
+    // The sentence at the top. Phrases go in lane order. "but" is used once, where the news first flips between good and bad;
+    // later flips get ", and". When focus and thinking are both normal they share one clause.
+    /*compose:start*/
+    function compose(levels, cap = true) {
+      const cl = [];
+      levels.forEach((lv, j) => { if (lv) cl.push({ t: LANES[j].words[lv - 1].t, good: LANES[j].words[lv - 1].good, j }); });
+      if (levels[1] === 3 && levels[2] === 3) cl.splice(cl.findIndex(c => c.j === 1), 2, { t: 'focus and thinking are normal', good: 1, merged: true, j: 1 });
+      let out = '', but = false, prev = '';
+      cl.forEach((c, i) => {
+        if (!i) { out = c.t; return; }
+        const flip = c.good !== cl[i - 1].good, last = i === cl.length - 1;
+        let join;
+        if (flip && !but) { join = ' but'; but = true; }
+        else if (flip) join = ', and';
+        else if (last && !c.merged && prev !== ', and') join = ' and';
+        else join = ',';
+        out += join + ' ' + c.t; prev = join;
+      });
+      return cap ? out.charAt(0).toUpperCase() + out.slice(1) : out;
+    }
+    /*compose:end*/
+    const sentence = () => compose(blobs.map(b => b.placed));
+    let shown = '__';
+    function showTitle() {
+      const text = sentence();
+      if (text === shown) return;
+      shown = text; titleEl.textContent = text;
+      const all = blobs.every(b => b.placed);
+      next.classList.toggle('on', all); next.setAttribute('aria-disabled', all ? 'false' : 'true');
+      window.moodPad = all ? { tension: blobs[0].placed, focus: blobs[1].placed, speed: blobs[2].placed } : null;
+    }
+    // The heartbeat of a placed blob: a full thump, then a softer one. Level 1 beats slowly, level 5 quickly.
+    const thump = (t, a) => { if (t <= 0) return 0; const q = t / a; return q * q * Math.exp(2 * (1 - q)); };
+    function beat(b, now) {
+      const per = 60 / b.bpm, age = (((now - b.t0) % per) + per) % per;
+      const one = a => thump(a, CFG.lubRise) + CFG.dub * thump(a - b.gap, CFG.dubRise);
+      return one(age) + one(age + per); // the tail of the last beat is still fading
+    }
+    function land(j) {
+      const b = blobs[j]; b.pending = false; b.placed = b.level;
+      const e = (b.level - 1) / 4; b.bpm = CFG.lowBpm * Math.pow(CFG.highBpm / CFG.lowBpm, e); b.gap = lerp(CFG.gapSlow, CFG.gapFast, e); b.t0 = hs.now;
+      b.sv -= 1.2; // a little thump as it lands
+      showTitle();
+      buzz(b.level === 5 || b.level === 1 ? 14 : 8);
+      const radio = radioBox.querySelector(`input[name=lane${j}][value="${b.level}"]`); if (radio) radio.checked = true;
+    }
+    function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {} }
+    function sendTo(j, level, kick) {
+      const b = blobs[j]; b.level = level; b.pending = true; b.held = false; b.side = Math.sign(b.y - yLevel[level]);
+      if (kick) { b.vx = kick.vx; b.vy = kick.vy; }
+      if (motion.matches) { b.x = laneX[j]; b.y = yLevel[level]; b.vx = b.vy = 0; land(j); }
+      dirty = true; wake();
+    }
+
+    function step(now) {
+      if (hs.last === null) hs.last = now;
+      const dt = clamp(now - hs.last, 0, 0.05); hs.last = now; hs.dt = dt; hs.now = now;
+      hs.dc += dt * CFG.driftSpeed;
+      const still = motion.matches, n = Math.max(1, Math.ceil(dt * 120)), h = dt / n, act = firstUnset();
+      moving = 0;
+      const mid = (yLevel[1] + yLevel[5]) / 2, span = yLevel[1] - yLevel[5];
+      for (let j = 0; j < 3; j++) {
+        const b = blobs[j], tx = laneX[j];
+        if (still) { b.x = tx; b.y = b.level ? yLevel[b.level] : yLevel[3]; b.vx = b.vy = 0; b.s = b.sv = 0; }
+        else for (let k = 0; k < n; k++) {
+          let ax, ay;
+          if (b.held) {
+            const w = CFG.hold, ty = clamp(b.holdY, wallTop, wallBot);
+            ax = -w * w * (b.x - tx) - 1.7 * w * b.vx; ay = -w * w * (b.y - ty) - 1.7 * w * b.vy;
+          } else if (b.level != null) {
+            const w = CFG.spring;
+            ax = -w * w * (b.x - tx) - 1.5 * w * b.vx; ay = -w * w * (b.y - yLevel[b.level]) - 2 * CFG.damping * w * b.vy;
+            if (!b.pending) for (let q = 0; q < 3; q++) { // a free blob swimming through gives it a little shove, and it springs back
+              const o = blobs[q]; if (q === j || o.level != null || o.held) continue;
+              const dx = b.x - o.x, dy = b.y - o.y, d = Math.hypot(dx, dy) || 1;
+              if (d < CFG.pushReach * R) { const f = (1 - d / (CFG.pushReach * R)) * CFG.pushForce * CFG.bump * (W / 412); ax += dx / d * f; ay += dy / d * f; }
+            }
+          } else {
+            // free: swims on gentle curves across the whole field, like a lava lamp. It never stops; at an edge it turns back.
+            const sc = W / 412, v0 = CFG.swim * W * (0.85 + 0.3 * Math.sin(0.21 * b.ws * now + b.p3));
+            b.th += CFG.swimTurn * (0.7 * Math.sin(0.55 * b.ws * now + b.p1) + 0.5 * Math.sin(0.31 * b.ws2 * now + b.p2)) * h;
+            // the heading slowly follows the way it is really going, so a push or a swirl carries on as a curve
+            const spd = Math.hypot(b.vx, b.vy);
+            if (spd > 8) { let d = Math.atan2(b.vy, b.vx) - b.th; d = Math.atan2(Math.sin(d), Math.cos(d)); b.th += d * CFG.follow * h; }
+            ax = (v0 * Math.cos(b.th) - b.vx) * CFG.swimEase; ay = (v0 * Math.sin(b.th) - b.vy) * CFG.swimEase;
+            const m = 1.2 * R, x0 = 0.7 * R, x1 = W - 0.7 * R;
+            // near an edge it curves back inwards before it gets there, without slowing down
+            let px = 0, py = 0;
+            if (b.x < x0 + m) px += (x0 + m - b.x) / m; if (b.x > x1 - m) px -= (b.x - (x1 - m)) / m;
+            if (b.y < wallTop + m) py += (wallTop + m - b.y) / m; if (b.y > wallBot - m) py -= (b.y - (wallBot - m)) / m;
+            const pm = Math.hypot(px, py);
+            if (pm > 0) { let d = Math.atan2(py, px) - b.th; d = Math.atan2(Math.sin(d), Math.cos(d)); b.th += d * Math.min(1, pm) * 3 * h; }
+            // the other blobs: close by they push apart, a bit further out they swirl round each other, from afar they are drawn together
+            for (let q = 0; q < 3; q++) {
+              if (q === j) continue;
+              const o = blobs[q], dx = b.x - o.x, dy = b.y - o.y, d = Math.hypot(dx, dy) || 1, nx = dx / d, ny = dy / d;
+              const turn = clamp(2 * Math.sin(0.09 * now + (j + q) * 2.1), -1, 1); // each pair circles one way, then slowly the other
+              if (d < CFG.pushReach * R) { const f = (1 - d / (CFG.pushReach * R)) * CFG.pushForce * sc; ax += nx * f; ay += ny * f; }
+              if (d < CFG.swirlReach * R) { const f = (1 - d / (CFG.swirlReach * R)) * CFG.swirlForce * sc * turn; ax += -ny * f; ay += nx * f; }
+              if (d > 2.5 * R && d < CFG.pullReach * R) { const f = Math.min(1, (d - 2.5 * R) / (2 * R)) * (1 - d / (CFG.pullReach * R)) * CFG.pullForce * sc; ax -= nx * f; ay -= ny * f; }
+              // a soft bump: they squash against each other as they pass
+              if (d < 1.5 * R) { const c = -(b.vx - o.vx) * nx - (b.vy - o.vy) * ny; if (c > 20) { b.sv -= c * 0.0006; b.ux = nx; b.uy = ny; } }
+            }
+          }
+          b.vx += ax * h; b.vy += ay * h; b.x += b.vx * h; b.y += b.vy * h;
+          if (b.level == null && !b.held) {
+            // an edge turns a free blob round and keeps it moving
+            const x0 = 0.7 * R, x1 = W - 0.7 * R;
+            if (b.x < x0) { b.x = x0; if (b.vx < 0) b.vx = -b.vx * 0.8; b.th = Math.PI - b.th; }
+            if (b.x > x1) { b.x = x1; if (b.vx > 0) b.vx = -b.vx * 0.8; b.th = Math.PI - b.th; }
+            if (b.y < wallTop) { b.y = wallTop; if (b.vy < 0) b.vy = -b.vy * 0.8; b.th = -b.th; }
+            if (b.y > wallBot) { b.y = wallBot; if (b.vy > 0) b.vy = -b.vy * 0.8; b.th = -b.th; }
+          }
+          // the top and bottom walls: a hard fling squashes against them
+          if (b.y < wallTop) { b.y = wallTop; if (b.vy < 0) { b.sv -= -b.vy * 0.0035; b.ux = 0; b.uy = 1; b.vy *= -0.3; } }
+          if (b.y > wallBot) { b.y = wallBot; if (b.vy > 0) { b.sv -= b.vy * 0.0035; b.ux = 0; b.uy = 1; b.vy *= -0.3; } }
+          b.x = clamp(b.x, R * 0.4, W - R * 0.4);
+        }
+        // the jelly: stretched along the way it is going, squashed and wobbling when it stops
+        const sp = Math.hypot(b.vx, b.vy); moving = Math.max(moving, sp);
+        if (sp > 40) { const k = 1 - Math.exp(-dt / 0.06); b.ux += (b.vx / sp - b.ux) * k; b.uy += (b.vy / sp - b.uy) * k; const m = Math.hypot(b.ux, b.uy) || 1; b.ux /= m; b.uy /= m; }
+        if (!still) {
+          const target = clamp(sp * CFG.stretchGain, 0, CFG.stretchMax), w = CFG.stretchSpring;
+          for (let k = 0; k < n; k++) { b.sv += (-w * w * (b.s - target) - 2 * CFG.stretchDamp * w * b.sv) * h; b.s += b.sv * h; }
+          b.s = clamp(b.s, -0.55, 1);
+        }
+        if (b.pending && !b.held && b.level != null) {
+          const off = b.y - yLevel[b.level], side = Math.sign(off);
+          // it has landed the first time it reaches its rung (or comes close enough to it)
+          if (Math.abs(off) < 8 || (b.side && side && side !== b.side)) land(j); else if (side) b.side = side;
+        }
+        const target = b.placed ? CFG.placedAmp : (j === act ? CFG.amp + 0.15 * Math.sin(now * TAU * 0.5) : CFG.quiet);
+        b.amp += (target - b.amp) * (1 - Math.exp(-dt / 0.4));
+      }
+    }
+
+    // ---------- each frame ----------
+    const cx = new Float32Array(3), cy = new Float32Array(3), ux = new Float32Array(3), uy = new Float32Array(3), iA = new Float32Array(3), iP = new Float32Array(3), cAmp = new Float32Array(3);
+    let litCount = 0;
+    function compute(now) {
+      const still = motion.matches, dt = hs.dt;
+      for (let j = 0; j < 3; j++) {
+        const b = blobs[j], bobX = still ? 0 : 2 * Math.sin(now * 0.45 + b.ph), bobY = still ? 0 : 2.5 * Math.sin(now * 0.6 + b.ph * 1.7);
+        cx[j] = b.x + (b.placed ? bobX : 0); cy[j] = b.y + (b.placed ? bobY : 0);
+        ux[j] = b.ux; uy[j] = b.uy;
+        const s = clamp(b.s, -0.55, 1);
+        iA[j] = 1 / (R * (1 + s)); iP[j] = 1 / (R / Math.sqrt(1 + s));
+        cAmp[j] = b.amp * (b.placed ? 1 + CFG.pulse * (still ? 0.3 : beat(b, now)) : 1);
+      }
+      const t0 = tint[0], t1 = tint[1], t2 = tint[2];
+      const falloff = CFG.falloff, edge = CFG.edge, tw = still ? 0 : CFG.twinkle, litSize = CFG.litSize, baseD = restD;
+      const trail = still ? 0 : smooth(CFG.trailMin, CFG.trailMax, moving), ed = Math.exp(-dt / CFG.trailFade);
+      const kIn = still ? 1 : 1 - Math.exp(-dt / CFG.fuzzIn), kOut = still ? 1 : 1 - Math.exp(-dt / CFG.fuzzOut);
+      const mIn = 1 - Math.exp(-dt / CFG.driftIn), mOut = 1 - Math.exp(-dt / CFG.driftOut);
+      const fuzzPx = CFG.fuzz * P, maxShift = CFG.maxShift * P, driftPx = still ? 0 : CFG.drift * P, dc = hs.dc, tnow = still ? 0 : now;
+      const pr = CFG.pale, rungGlow = CFG.rungGlow;
+      litCount = 0;
+      for (let i = 0, o = 0; i < N; i++, o += 8) {
+        const x = bx[i], y = by[i], n = nz[i];
+        let I = 0, cr = 0, cg = 0, cb = 0;
+        for (let j = 0; j < 3; j++) {
+          const dx = x - cx[j], dy = y - cy[j];
+          const a = (dx * ux[j] + dy * uy[j]) * iA[j], p = (-dx * uy[j] + dy * ux[j]) * iP[j], d2 = a * a + p * p;
+          if (d2 >= 7) continue;
+          const v = Math.exp(-falloff * d2) * cAmp[j] * (1 + 0.25 * n), c = j === 0 ? t0 : j === 1 ? t1 : t2;
+          I += v; cr += v * c[0]; cg += v * c[1]; cb += v * c[2];
+        }
+        if (I > 0) { cr /= I; cg /= I; cb /= I; }
+        let e = em[i] * ed;
+        if (trail > 0 && I * trail * CFG.trailAmp > e) { e = I * trail * CFG.trailAmp; ecol[3 * i] = cr; ecol[3 * i + 1] = cg; ecol[3 * i + 2] = cb; }
+        em[i] = e;
+        const lit = Math.max(I, e);
+        const t = th[i] + tw * Math.sin(tf[i] * tnow + tp[i]);
+        let l = clamp((lit - t + edge) / (2 * edge), 0, 1); l = l * l * (3 - 2 * l);
+        const bright = 0.62 + 0.38 * Math.min(1, lit);
+        // loosening and wandering, where a blob is
+        const F = still ? 0 : smooth(0.1, 0.8, lit);
+        fz[i] += (F - fz[i]) * (F > fz[i] ? kIn : kOut);
+        mv[i] += (F - mv[i]) * (F > mv[i] ? mIn : mOut);
+        const m = fz[i] * fuzzPx;
+        let wx = 0, wy = 0;
+        if (mv[i] > 0.004 && driftPx > 0) {
+          const q = 8 * i, a2 = mv[i] * driftPx;
+          wx = a2 * (0.65 * Math.sin(dc * dr[q] + dr[q + 1]) + 0.35 * Math.sin(dc * dr[q + 4] + dr[q + 5]));
+          wy = a2 * (0.65 * Math.sin(dc * dr[q + 2] + dr[q + 3]) + 0.35 * Math.sin(dc * dr[q + 6] + dr[q + 7]));
+        }
+        out[o] = x + clamp(gx[i] * m + wx, -maxShift, maxShift); out[o + 1] = y + clamp(gy[i] * m + wy, -maxShift, maxShift);
+        const rv = rung[i] * rungGlow;
+        if (l > 0 && l >= rv) {
+          if (l > 0.5) litCount++;
+          out[o + 2] = baseD * szv[i] * (1 + litSize * l); out[o + 4] = l;
+          if (e > I) { out[o + 5] = ecol[3 * i] * bright; out[o + 6] = ecol[3 * i + 1] * bright; out[o + 7] = ecol[3 * i + 2] * bright; }
+          else { out[o + 5] = cr * bright; out[o + 6] = cg * bright; out[o + 7] = cb * bright; }
+        } else {
+          out[o + 2] = baseD * szv[i] * (1 + CFG.rungSize * rv / CFG.rungGlow); out[o + 4] = rv;
+          out[o + 5] = pr[0] / 255; out[o + 6] = pr[1] / 255; out[o + 7] = pr[2] / 255;
+        }
+        out[o + 3] = vig[i];
+      }
+    }
+
+    function makeRenderer() {
+      const gl = canvas.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: true, powerPreference: 'low-power' });
+      const c0 = CFG.colour, bg = CFG.bg;
+      if (gl) {
+        const vs = `attribute vec2 aPos;attribute float aSize;attribute float aAlpha;attribute float aWarm;attribute vec3 aCol;
+          uniform vec2 uView;uniform float uDpr;varying float vAlpha;varying float vWarm;varying float vPx;varying vec3 vCol;
+          void main(){gl_Position=vec4(aPos.x/uView.x*2.0-1.0,1.0-aPos.y/uView.y*2.0,0.0,1.0);
+            vPx=aSize*uDpr;gl_PointSize=vPx+2.0;vAlpha=aAlpha;vWarm=aWarm;vCol=aCol;}`;
+        // Every dot is a flat disc with a one-pixel edge.
+        const fs = `precision mediump float;varying float vAlpha;varying float vWarm;varying float vPx;varying vec3 vCol;
+          uniform vec3 uC0;
+          void main(){float d=length(gl_PointCoord*2.0-1.0)*(vPx+2.0)*0.5;
+            float a=vAlpha*clamp(vPx*0.5-d+0.5,0.0,1.0);
+            gl_FragColor=vec4(mix(uC0,vCol,vWarm)*a,a);}`;
+        const shader = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+        try {
+          const prog = gl.createProgram();
+          gl.attachShader(prog, shader(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(prog);
+          if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+          gl.useProgram(prog);
+          const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+          const attr = (name, size, offset) => { const loc = gl.getAttribLocation(prog, name); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 32, offset); };
+          attr('aPos', 2, 0); attr('aSize', 1, 8); attr('aAlpha', 1, 12); attr('aWarm', 1, 16); attr('aCol', 3, 20);
+          const uView = gl.getUniformLocation(prog, 'uView'), uDpr = gl.getUniformLocation(prog, 'uDpr');
+          gl.uniform3f(gl.getUniformLocation(prog, 'uC0'), c0[0] / 255, c0[1] / 255, c0[2] / 255);
+          gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+          gl.clearColor(bg[0] / 255, bg[1] / 255, bg[2] / 255, 1);
+          let capacity = 0;
+          return {
+            kind: 'webgl',
+            resize() { gl.viewport(0, 0, canvas.width, canvas.height); gl.uniform2f(uView, W, Hgt); gl.uniform1f(uDpr, dpr); },
+            draw() {
+              gl.clear(gl.COLOR_BUFFER_BIT);
+              if (out.length > capacity) { gl.bufferData(gl.ARRAY_BUFFER, out, gl.DYNAMIC_DRAW); capacity = out.length; }
+              else gl.bufferSubData(gl.ARRAY_BUFFER, 0, out);
+              gl.drawArrays(gl.POINTS, 0, N);
+            }
+          };
+        } catch (_) { /* fall through to plain canvas */ }
+      }
+      const ctx = canvas.getContext('2d');
+      const fill = `rgb(${bg.join(',')})`;
+      return {
+        kind: '2d',
+        resize() { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); },
+        draw() {
+          ctx.fillStyle = fill; ctx.fillRect(0, 0, W, Hgt);
+          // Dots of the same colour and fade are drawn together, so a frame is a handful of fills, not thousands.
+          const groups = new Map();
+          for (let i = 0, o = 0; i < N; i++, o += 8) {
+            const a = out[o + 3]; if (a < 0.02) continue;
+            const key = ((Math.round(a * 6) * 8 + Math.round(out[o + 4] * 7)) * 4096) + Math.round(out[o + 5] * 15) * 256 + Math.round(out[o + 6] * 15) * 16 + Math.round(out[o + 7] * 15);
+            let g = groups.get(key); if (!g) groups.set(key, g = []);
+            g.push(o);
+          }
+          groups.forEach((list, key) => {
+            const c = key % 4096, rest = (key - c) / 4096, a = (rest >> 3) / 6, w = (rest & 7) / 7;
+            const r = (c >> 8) / 15 * 255, g = ((c >> 4) & 15) / 15 * 255, b = (c & 15) / 15 * 255;
+            ctx.fillStyle = `rgba(${Math.round(lerp(c0[0], r, w))},${Math.round(lerp(c0[1], g, w))},${Math.round(lerp(c0[2], b, w))},${a.toFixed(3)})`;
+            ctx.beginPath();
+            for (const o of list) { const rad = out[o + 2] / 2; ctx.moveTo(out[o] + rad, out[o + 1]); ctx.arc(out[o], out[o + 1], rad, 0, 6.2832); }
+            ctx.fill();
+          });
+        }
+      };
+    }
+
+    let renderer = makeRenderer();
+    pad.dataset.renderer = renderer.kind;
+    canvas.addEventListener('webglcontextlost', e => e.preventDefault());
+    canvas.addEventListener('webglcontextrestored', () => { renderer = makeRenderer(); renderer.resize(); dirty = true; wake(); });
+
+    function render(now) { if (!blobs.length || !N) return; step(now); compute(now); renderer.draw(); dirty = false; }
+
+    // ---------- touch: a tap or a fling sends a blob to its lane ----------
+    const local = e => { const r = pad.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    function pickBlob(x, y) {
+      let best = -1, d = 1.5 * R;
+      blobs.forEach((b, j) => { if (b.placed) { const k = Math.hypot(x - b.x, y - b.y); if (k < d) { d = k; best = j; } } });
+      if (best >= 0) return best;
+      const f = firstUnset(); if (f >= 0) return f;
+      let lane = 0; for (let j = 1; j < 3; j++) if (Math.abs(x - laneX[j]) < Math.abs(x - laneX[lane])) lane = j;
+      return lane;
+    }
+    function velocity() {
+      const t1 = clock(); const s = samples.filter(p => t1 - p.t < 0.1);
+      if (s.length < 2 || t1 - samples[samples.length - 1].t > 0.08) return 0;
+      const a = s[0], b = s[s.length - 1], dt = b.t - a.t; return dt > 0.005 ? (b.y - a.y) / dt : 0;
+    }
+    hit.addEventListener('pointerdown', e => {
+      if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0) || dragging !== null) return;
+      const [x, y] = local(e); try { hit.setPointerCapture(e.pointerId); } catch (_) {}
+      const j = pickBlob(x, y); dragging = { j, id: e.pointerId };
+      const b = blobs[j]; b.held = true; b.holdY = y; b.pending = false; lastTouch = clock();
+      samples = [{ y, t: clock() }]; buzz(5); dirty = true; wake();
+    });
+    hit.addEventListener('pointermove', e => {
+      if (!dragging || e.pointerId !== dragging.id) return;
+      const [, y] = local(e); blobs[dragging.j].holdY = y; samples.push({ y, t: clock() }); if (samples.length > 12) samples.shift(); lastTouch = clock();
+    });
+    const release = e => {
+      if (!dragging || e.pointerId !== dragging.id) return;
+      const j = dragging.j, b = blobs[j], vy = velocity(), speed = Math.abs(vy); dragging = null; lastTouch = clock();
+      if (speed >= CFG.flingMin) {
+        // a flick sends it one level up or down from where it is (from the middle if it was free); a hard fling sends it two
+        const dir = vy < 0 ? 1 : -1, level = clamp((b.level != null ? b.level : 3) + dir * (speed >= CFG.flingHard ? 2 : 1), 1, 5);
+        sendTo(j, level, { vx: 0, vy: clamp(vy * CFG.flingKick, -1800, 1800) });
+      } else sendTo(j, nearestLevel(b.holdY));
+    };
+    hit.addEventListener('pointerup', release);
+    hit.addEventListener('pointercancel', release);
+    hit.addEventListener('contextmenu', e => e.preventDefault());
+
+    // screen-reader choices
+    LANES.forEach((lane, j) => {
+      const fs = document.createElement('fieldset'), lg = document.createElement('legend'); lg.textContent = lane.name + ', from 1 to 5'; fs.appendChild(lg);
+      lane.words.forEach((w, k) => {
+        const lb = document.createElement('label'), inp = document.createElement('input');
+        inp.type = 'radio'; inp.name = 'lane' + j; inp.value = String(k + 1);
+        inp.addEventListener('change', () => { if (inp.checked) sendTo(j, k + 1); });
+        lb.appendChild(inp); lb.appendChild(document.createTextNode(' ' + w.t.charAt(0).toUpperCase() + w.t.slice(1))); fs.appendChild(lb);
+      });
+      radioBox.appendChild(fs);
+    });
+    next.addEventListener('click', () => {
+      if (!window.moodPad) return;
+      next.classList.add('pressed'); setTimeout(() => next.classList.remove('pressed'), 160);
+      pad.dispatchEvent(new CustomEvent('pad:continue', { detail: window.moodPad }));
+    });
+    back.addEventListener('click', () => { pad.dispatchEvent(new CustomEvent('pad:back')); if (!window.__FLOW) reset(); });
+
+    // ---------- the loop ----------
+    let raf = 0, lastFrame = 0;
+    function loop(ms) {
+      raf = requestAnimationFrame(loop);
+      if (paused) { cancelAnimationFrame(raf); raf = 0; return; }
+      const now = clock();
+      const busy = dragging || moving > 8 || now - lastTouch < 2;
+      if (ms - lastFrame < 1000 / (busy ? CFG.activeFps : CFG.calmFps) - 2) return;
+      lastFrame = ms;
+      if (!motion.matches || dirty) render(now); else { cancelAnimationFrame(raf); raf = 0; }
+    }
+    function wake() { if (!raf && !paused && !document.hidden && !testClock) raf = requestAnimationFrame(loop); }
+    document.addEventListener('visibilitychange', () => { if (document.hidden) { cancelAnimationFrame(raf); raf = 0; } else { hs.last = null; wake(); } });
+    motion.addEventListener && motion.addEventListener('change', () => { dirty = true; wake(); });
+
+    // Screen one hands over the colour it chose; everything else starts fresh.
+    function show(sel) {
+      const s = sel || { pleasant: base.pu, energy: base.e };
+      // coming back with the same colour keeps what was already placed
+      if (!(blobs.length && s.pleasant === base.pu && s.energy === base.e)) { setColour(s.pleasant, s.energy); reset(); }
+      paused = false; hs.last = null; pad.classList.remove('off');
+      if (testClock) render(clock()); else wake();
+    }
+    function hide() { paused = true; pad.classList.add('off'); cancelAnimationFrame(raf); raf = 0; }
+    window.screenTwo = { show, hide, reset };
+
+    if (testClock) {
+      window.__heartFrame = () => render(clock());
+      window.__blobs = () => ({ blobs: blobs.map(b => ({ x: +b.x.toFixed(1), y: +b.y.toFixed(1), level: b.level, placed: b.placed, stretch: +b.s.toFixed(2), speed: +Math.hypot(b.vx, b.vy).toFixed(1), amp: +b.amp.toFixed(2) })), title: titleEl.textContent, next: next.classList.contains('on'), lit: litCount, yLevel: yLevel.slice(1), laneX: laneX.slice(), R, moodPad: window.moodPad || null, renderer: renderer.kind });
+      window.__heartOut = () => ({ out, N });
+    }
+
+    const vv = window.visualViewport;
+    function fit() {
+      const usable = vv && Math.abs(vv.scale - 1) < 0.01;
+      document.documentElement.style.setProperty('--app-h', (usable ? vv.height : window.innerHeight) + 'px');
+      document.documentElement.style.setProperty('--app-top', (usable ? Math.max(0, vv.offsetTop) : 0) + 'px');
+      requestAnimationFrame(() => {
+        build();
+        if (!blobs.length) { setColour(base.pu, base.e); reset(); }
+        else blobs.forEach((b, j) => { if (b.level != null) { b.x = laneX[j]; b.y = yLevel[b.level]; b.vx = b.vy = 0; } b.holdY = b.y; });
+        if (testClock) render(clock());
+      });
+    }
+    if (vv) vv.addEventListener('resize', fit);
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', () => setTimeout(fit, 250));
+    const params = new URLSearchParams(location.search);
+    if (params.has('pu')) setColour(+params.get('pu'), +params.get('e') || 0.5); else setColour(0.8, 0.8);
+    if (window.__FLOW) { pad.classList.add('off'); paused = true; }
+    const go = () => { fit(); wake(); };
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(go); else go();
+  })();
+  </script>
+</body>
+</html>
