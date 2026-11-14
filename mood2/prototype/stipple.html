@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#101116">
+  <title>Mood check-in · screen one</title>
+  <style>
+    /* Labels only need eight capital letters, so the font is cut down to a few kilobytes. */
+    @font-face{font-family:"Geist Mono";src:url(geist-mono-ui.woff2) format("woff2");font-weight:100 900;font-display:block}
+    :root{
+      --bg:#101116;          /* graphite */
+      --label:#B0B1B3;       /* silver-grey */
+      --dim:#505157;         /* the forward arrow before a choice */
+      --lavender:#ABA4DF;    /* the forward arrow after a choice */
+      --safe-t:env(safe-area-inset-top,0px);
+      --safe-b:env(safe-area-inset-bottom,0px);
+      --safe-l:env(safe-area-inset-left,0px);
+      --safe-r:env(safe-area-inset-right,0px);
+      color-scheme:dark;
+      -webkit-text-size-adjust:100%;
+      text-size-adjust:100%;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+    body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+    button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    :focus-visible{outline:1.5px solid var(--label);outline-offset:4px}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+    /* The whole screen is the field. app-h follows the visible part of the screen. */
+    .heart{position:fixed;left:0;top:var(--app-top,0px);width:100%;height:var(--app-h,100dvh);overflow:hidden;background:var(--bg);touch-action:none}
+    .field{position:absolute;inset:0;width:100%;height:100%;display:block}
+    .hit{position:absolute;inset:0;touch-action:none;cursor:crosshair}
+
+    .axis{position:absolute;font-family:"Geist Mono",ui-monospace,"Roboto Mono",monospace;font-size:11.2px;font-weight:400;line-height:1;letter-spacing:.09em;color:var(--label);white-space:nowrap;pointer-events:none}
+    .axis-high{top:calc(var(--safe-t) + 58px);left:50%;transform:translateX(-50%);padding-left:.09em}
+    .axis-low{bottom:calc(var(--safe-b) + 66px);left:50%;transform:translateX(-50%);padding-left:.09em}
+    .axis-left{left:calc(var(--safe-l) + 10px);top:48%;transform:translateY(-50%)}
+    .axis-right{right:calc(var(--safe-r) + 8px);top:48%;transform:translateY(-50%)}
+
+    .back{position:absolute;z-index:3;top:calc(var(--safe-t) + 2px);left:calc(var(--safe-l) + 6px);width:52px;height:46px;display:grid;place-items:center;color:var(--label)}
+    .back svg{width:22px;height:14px}
+    .next{position:absolute;z-index:3;right:calc(var(--safe-r) + 12px);bottom:calc(var(--safe-b) + 14px);width:61px;height:61px;display:grid;place-items:center;color:var(--dim);transition:color .3s ease,transform .15s ease}
+    .next svg{width:52px;height:52px;overflow:visible}
+    .next.on{color:var(--lavender)}
+    .next.on:active{transform:scale(.95)}
+    .next.pressed{transform:scale(.93)}
+    @media (prefers-reduced-motion:reduce){.next{transition:none!important}}
+    .heart.off{visibility:hidden;pointer-events:none}
+  </style>
+</head>
+<body>
+  <main class="heart" id="heart">
+    <canvas class="field" id="field" aria-hidden="true"></canvas>
+    <div class="hit" id="hit" aria-hidden="true"></div>
+
+    <span class="axis axis-high" aria-hidden="true">HIGH ENERGY</span>
+    <span class="axis axis-low" aria-hidden="true">LOW ENERGY</span>
+    <span class="axis axis-left" aria-hidden="true">UNPLEASANT</span>
+    <span class="axis axis-right" aria-hidden="true">PLEASANT</span>
+
+    <button class="back" id="back" type="button" aria-label="Back">
+      <svg viewBox="0 0 22 14" aria-hidden="true"><path d="M21 7H1.6M7.4 1.2 1.6 7l5.8 5.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="next" id="next" type="button" aria-label="Continue" aria-disabled="true">
+      <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="25.2" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M15.5 26h20.5M29.5 19.4 36 26l-6.5 6.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+
+    <!-- For screen readers: the same choice as four regions, plus the axis names in full. -->
+    <fieldset class="sr-only" id="regions">
+      <legend>How do you feel right now? Energy runs from low at the bottom to high at the top. Pleasantness runs from unpleasant on the left to pleasant on the right.</legend>
+      <label><input type="radio" name="region" value="high_unpleasant"> High energy, unpleasant</label>
+      <label><input type="radio" name="region" value="high_pleasant"> High energy, pleasant</label>
+      <label><input type="radio" name="region" value="low_unpleasant"> Low energy, unpleasant</label>
+      <label><input type="radio" name="region" value="low_pleasant"> Low energy, pleasant</label>
+    </fieldset>
+    <p class="sr-only" id="said" aria-live="polite"></p>
+  </main>
+
+  <script>
+  (() => {
+    'use strict';
+
+    // Starting values. Tune these on the phone.
+    const CFG = {
+      // the grid: a field of small single dots
+      columns: 64,          // dots across the width, so the grid looks the same on every phone
+      minPitch: 5.2, maxPitch: 7.2, // CSS px between dots, kept inside these limits
+      dot: 1.15,            // resting diameter in CSS px
+      dotVary: 0.22,        // each dot is a little bigger or smaller than its neighbours
+      litSize: 0.6,         // a lit dot is this much bigger than a resting one (0 = same size)
+      colour: [112, 114, 140],   // the quiet grid
+      pale: [226, 224, 244],     // the glow at rest, and in the middle of the screen
+      bg: [16, 17, 22],          // #101116
+      // one colour for each corner of the Mood Meter, blended smoothly in between
+      gold: [245, 196, 104],     // high energy, pleasant
+      red: [244, 92, 84],        // high energy, unpleasant
+      blue: [122, 146, 255],     // low energy, unpleasant
+      mint: [108, 230, 174],     // low energy, pleasant
+      blendSharp: 2,             // 1 = a plain blend between the corners; higher keeps the colour of the nearest corner longer
+      // the heartbeat: a full thump, then a softer one
+      lowBpm: 28, highBpm: 60,   // beats a minute at the bottom and the top; the middle comes out near 41
+      tempoEase: 0.35,      // seconds for the tempo to settle after the finger moves
+      styleEase: 0.4,       // seconds for the colour to follow the finger
+      dub: 0.3,             // the second thump, as a share of the first
+      lubRise: 0.12, dubRise: 0.10, // seconds to reach the top of each thump
+      gapSlow: 0.46, gapFast: 0.34, // seconds between the two thumps: wider when slow
+      floor: 0.4,           // how much glow is left between beats
+      hrv: 0.04, vary: 0.08, // how much each beat differs in timing and strength
+      // the cloud of light
+      radius: 0.30,         // size of a chosen cloud, as a share of the screen width
+      falloff: 1.5,         // how quickly the glow thins away from the middle of the cloud (bigger = tighter)
+      restRadius: 0.75, restAmp: 1.0, // before any touch: a little smaller
+      pickAmp: 1.5,         // how strong a chosen cloud is (above 1 keeps its core lit even between beats)
+      edge: 0.1,            // how softly a dot switches on and off
+      twinkle: 0.1,         // how much single dots flicker on their own
+      // a touch loosens the dots around it into a scatter
+      fuzz: 1.3,            // how far dots drift from their place, in gaps
+      fuzzReach: 1.2,       // how far the scatter reaches, in cloud radii
+      maxShift: 3,          // the furthest a dot ever drifts, in gaps
+      fuzzIn: 0.14, fuzzOut: 0.7, // seconds for dots to loosen, and to settle back
+      pickEase: 0.4, followEase: 0.09,
+      // between beats the dots wander a little: most in the middle of the cloud, less around it, not at all in the faded background
+      drift: 0.55,          // how far a dot wanders from its spot, in gaps
+      driftHalo: 0.3,       // how much of that the dots around the cloud do
+      driftReach: 1.9,      // how far around the cloud they still wander, in cloud radii
+      driftSlow: 0.4, driftFast: 1.8, // how quickly they wander: lazy when energy is low, brisk when it is high
+      driftIn: 0.35, driftOut: 0.9,   // seconds for the wander to start and to settle
+      // the tap
+      tapAmp: 1.5, tapPhase: 0.15,
+      ringSpeed: 420, ringWidth: 34, ringAmp: 0.9, ringFade: 0.85, ringLife: 2.8,
+      // dragging
+      trailMin: 30, trailMax: 170, trailFade: 0.7,
+      ghostFade: 0.28,
+      calmFps: 30, activeFps: 60, // the screen redraws less while nothing is happening, which keeps the phone cool
+      seed: 0
+    };
+    Object.assign(CFG, window.HEART_CFG || {}); // lets a test page try other values
+    // Tests can step time exactly; on a phone this is just the normal clock.
+    const testClock = typeof window.HEART_CLOCK === 'function';
+    const clock = () => (testClock ? window.HEART_CLOCK() : performance.now()) / 1000;
+    const TAU = Math.PI * 2;
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const lerp = (a, b, k) => a + (b - a) * k;
+    const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+    // A small seeded random source, so a test can replay exactly the same heart.
+    let seedState = (CFG.seed || Math.floor(Math.random() * 4294967296)) >>> 0;
+    const rand = () => { seedState = (seedState + 0x6D2B79F5) >>> 0; let t = seedState; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const hashAt = (i, j, s) => { let h = Math.imul(i, 374761393) ^ Math.imul(j, 668265263) ^ Math.imul(s, 2147483647); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+    const vnoise = (x, y, s) => { // smooth noise from -1 to 1
+      const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+      const a = hashAt(xi, yi, s), b = hashAt(xi + 1, yi, s), c = hashAt(xi, yi + 1, s), d = hashAt(xi + 1, yi + 1, s);
+      return (lerp(lerp(a, b, u), lerp(c, d, u), v)) * 2 - 1;
+    };
+
+    // Colours are blended in OKLab, where a halfway colour looks halfway, so red to green never turns muddy.
+    const lin = c => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+    const gam = c => { c = clamp(c, 0, 1); return c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055; };
+    const toLab = ([r, g, b]) => {
+      const R = lin(r), G = lin(g), B = lin(b);
+      const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B), m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B), s = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+      return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+    };
+    const fromLab = ([L, a, b]) => {
+      const l = Math.pow(L + 0.3963377774 * a + 0.2158037573 * b, 3), m = Math.pow(L - 0.1055613458 * a - 0.0638541728 * b, 3), s = Math.pow(L - 0.0894841775 * a - 1.2914855480 * b, 3);
+      return [gam(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s), gam(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s), gam(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s)];
+    };
+    const LAB = { pale: toLab(CFG.pale), hp: toLab(CFG.gold), hu: toLab(CFG.red), lu: toLab(CFG.blue), lp: toLab(CFG.mint) };
+
+    const heart = document.getElementById('heart'), canvas = document.getElementById('field'), hit = document.getElementById('hit');
+    const next = document.getElementById('next'), back = document.getElementById('back');
+    const said = document.getElementById('said'), radios = [...document.querySelectorAll('input[name=region]')];
+    const axis = { high: document.querySelector('.axis-high'), low: document.querySelector('.axis-low'), left: document.querySelector('.axis-left') };
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const NAMES = { high_unpleasant: 'High energy, unpleasant', high_pleasant: 'High energy, pleasant', low_unpleasant: 'Low energy, unpleasant', low_pleasant: 'Low energy, pleasant' };
+
+    // ---------- the dot grid ----------
+    let W = 0, Hgt = 0, dpr = 1, N = 0, P = 6, restD = 1;
+    let bx, by, vig, th, nz, gx, gy, szv, tf, tp, fz, em, ecol, mv, dr, out;
+    let yTop = 0, yMid = 0, yBot = 0;
+    let dirty = true;
+
+    function build() {
+      const box = heart.getBoundingClientRect();
+      W = box.width; Hgt = box.height;
+      dpr = Math.min(3, window.devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(Hgt * dpr);
+      P = clamp(W / CFG.columns, CFG.minPitch, CFG.maxPitch);
+      restD = CFG.dot;
+      const cols = Math.ceil(W / P) + 1, rows = Math.ceil(Hgt / P) + 1;
+      const x0 = (W - (cols - 1) * P) / 2, y0 = (Hgt - (rows - 1) * P) / 2;
+      N = cols * rows;
+      bx = new Float32Array(N); by = new Float32Array(N); vig = new Float32Array(N); th = new Float32Array(N); nz = new Float32Array(N);
+      gx = new Float32Array(N); gy = new Float32Array(N); szv = new Float32Array(N); tf = new Float32Array(N); tp = new Float32Array(N);
+      fz = new Float32Array(N); em = new Float32Array(N); mv = new Float32Array(N); dr = new Float32Array(N * 8); ecol = new Float32Array(N * 3); out = new Float32Array(N * 8);
+      // Each dot sits on a whole device pixel, so a resting dot is the same crisp disc everywhere.
+      const snap = v => (Math.round(v * dpr - 0.5) + 0.5) / dpr;
+      let i = 0;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++, i++) {
+        const x = snap(x0 + c * P), y = snap(y0 + r * P), u = x / W, v = y / Hgt;
+        bx[i] = x; by[i] = y;
+        // A gentle fade into the background at the perimeter.
+        vig[i] = smooth(-0.01, 0.12, v) * smooth(1.01, 0.88, v) * smooth(-0.015, 0.06, u) * smooth(1.015, 0.94, u);
+        th[i] = hashAt(c, r, 5);                       // how much glow it takes to switch this dot on
+        nz[i] = vnoise(c / 6, r / 6, 17);              // an uneven edge to the cloud
+        const u1 = Math.max(1e-6, hashAt(c, r, 3)), u2 = hashAt(c, r, 4), m = Math.sqrt(-2 * Math.log(u1));
+        gx[i] = clamp(m * Math.cos(TAU * u2), -2.4, 2.4); gy[i] = clamp(m * Math.sin(TAU * u2), -2.4, 2.4); // where it drifts to when loosened
+        szv[i] = 1 + CFG.dotVary * (hashAt(c, r, 6) * 2 - 1);
+        tf[i] = (0.08 + 0.22 * hashAt(c, r, 8)) * TAU; tp[i] = hashAt(c, r, 9) * TAU; // its own slow flicker
+        // its own slow wander: two gentle waves in each direction, every dot different
+        for (let k = 0; k < 2; k++) {
+          dr[8 * i + 4 * k] = (k ? 1.7 : 0.8) + (k ? 1.2 : 0.7) * hashAt(c, r, 20 + k * 4);       // x speed
+          dr[8 * i + 4 * k + 1] = hashAt(c, r, 21 + k * 4) * TAU;                                  // x start
+          dr[8 * i + 4 * k + 2] = (k ? 1.7 : 0.8) + (k ? 1.2 : 0.7) * hashAt(c, r, 22 + k * 4);   // y speed
+          dr[8 * i + 4 * k + 3] = hashAt(c, r, 23 + k * 4) * TAU;                                  // y start
+        }
+      }
+      // Energy is read between the HIGH and LOW labels, with its midpoint on the line of the side labels.
+      const top = heart.getBoundingClientRect().top, mid = r => (r.top + r.bottom) / 2 - top;
+      yTop = mid(axis.high.getBoundingClientRect()); yBot = mid(axis.low.getBoundingClientRect()); yMid = mid(axis.left.getBoundingClientRect());
+      if (!selection) { hc.x = hc.tx = W / 2; hc.y = hc.ty = yMid; }
+      renderer.resize();
+      dirty = true;
+    }
+
+    // ---------- the heart ----------
+    // hc is the cloud of light that beats. At rest it sits in the middle, small and pale. A touch makes it bigger, loosens the dots around it, and gives it a colour.
+    const hs = { bpm: 0, target: 0, e: 0.5, eT: 0.5, u: 0.5, uT: 0.5, phase: 0.85, interval: 1, ar: 0, beats: [], last: null, dt: 0, spawned: 0, dc: 0, dspeed: 1 };
+    const tempoFor = e => CFG.lowBpm * Math.pow(CFG.highBpm / CFG.lowBpm, clamp(e, 0, 1)); // 28 at the bottom, about 41 in the middle, 60 at the top
+    hs.bpm = hs.target = tempoFor(0.5);
+    const hc = { x: 0, y: 0, tx: 0, ty: 0, pick: 0, pickT: 0, s: 1, sp: 0 };
+    const ghosts = [], rings = [];
+    let selection = null, dragging = false, pointer = null, lastTouch = -99;
+    const home = () => ({ x: W / 2, y: yMid });
+
+    // One thump: a quick rise, then a fall. The glow is the number of dots switched on, so a thump spreads and thins; it never swells a dot.
+    const thump = (t, a) => { if (t <= 0) return 0; const q = t / a; return q * q * Math.exp(2 * (1 - q)); };
+    function envelope(now) {
+      let v = 0;
+      for (const b of hs.beats) { const age = now - b.t0; v += b.amp * (thump(age, CFG.lubRise) + CFG.dub * thump(age - b.gap, CFG.dubRise)); }
+      return Math.min(v, 1.7);
+    }
+    function beat(t0, amp) {
+      hs.beats.push({ t0, amp: amp * (1 + CFG.vary * (rand() * 2 - 1)), gap: lerp(CFG.gapSlow, CFG.gapFast, hs.e) });
+      hs.spawned++;
+      hs.ar = 0.6 * hs.ar + 0.8 * (rand() * 2 - 1);   // the next beat comes a touch early or late
+      hs.interval = 1 + CFG.hrv * hs.ar;
+    }
+    function step(now) {
+      if (hs.last === null) hs.last = now;
+      const dt = clamp(now - hs.last, 0, 0.1); hs.last = now; hs.dt = dt;
+      const still = motion.matches;
+      const k = 1 - Math.exp(-dt / CFG.tempoEase), ks = 1 - Math.exp(-dt / CFG.styleEase);
+      hs.bpm = lerp(hs.bpm, hs.target, k);
+      if (still) { hs.e = hs.eT; hs.u = hs.uT; hc.pick = hc.pickT; hc.s = 1; hc.x = hc.tx; hc.y = hc.ty; hc.sp = 0; ghosts.length = 0; rings.length = 0; hs.beats.length = 0; return; }
+      hs.e = lerp(hs.e, hs.eT, ks); hs.u = lerp(hs.u, hs.uT, ks);
+      hs.dspeed = CFG.driftSlow * Math.pow(CFG.driftFast / CFG.driftSlow, clamp(hs.e, 0, 1)); hs.dc += dt * hs.dspeed; // the wander keeps its own clock, so a change of pace never makes dots jump
+      hc.pick = lerp(hc.pick, hc.pickT, 1 - Math.exp(-dt / CFG.pickEase));
+      hc.s = lerp(hc.s, 1, 1 - Math.exp(-dt / 0.4));
+      const kf = 1 - Math.exp(-dt / CFG.followEase), nx = lerp(hc.x, hc.tx, kf), ny = lerp(hc.y, hc.ty, kf);
+      hc.sp = lerp(hc.sp, dt > 0 ? Math.hypot(nx - hc.x, ny - hc.y) / dt : 0, 1 - Math.exp(-dt / 0.12));
+      hc.x = nx; hc.y = ny;
+      const kg = Math.exp(-dt / CFG.ghostFade);
+      for (const g of ghosts) g.s *= kg;
+      for (let i = ghosts.length - 1; i >= 0; i--) if (ghosts[i].s < 0.02) ghosts.splice(i, 1);
+      for (let i = rings.length - 1; i >= 0; i--) if (now - rings[i].t0 > CFG.ringLife) rings.splice(i, 1);
+      hs.phase += dt * hs.bpm / 60 / hs.interval;
+      if (hs.phase >= 1) { hs.phase -= Math.floor(hs.phase); beat(now - hs.phase * 60 * hs.interval / hs.bpm, 1); }
+      while (hs.beats.length && now - hs.beats[0].t0 > 3) hs.beats.shift();
+    }
+
+    // The colour of the light: blended between the four corners, pale in the middle and stronger towards the edges.
+    const cur = [0.89, 0.88, 0.96];
+    function colourNow() {
+      const pu = clamp(1 - hs.u, 0, 1), e = clamp(hs.e, 0, 1);
+      const sh = CFG.blendSharp, wHU0 = Math.pow((1 - pu) * e, sh), wHP0 = Math.pow(pu * e, sh), wLU0 = Math.pow((1 - pu) * (1 - e), sh), wLP0 = Math.pow(pu * (1 - e), sh);
+      const tot = wHU0 + wHP0 + wLU0 + wLP0 || 1, wHU = wHU0 / tot, wHP = wHP0 / tot, wLU = wLU0 / tot, wLP = wLP0 / tot;
+      const q = [0, 1, 2].map(j => wHU * LAB.hu[j] + wHP * LAB.hp[j] + wLU * LAB.lu[j] + wLP * LAB.lp[j]);
+      const rad = Math.hypot(pu - 0.5, e - 0.5) * 2 / Math.SQRT2;       // 0 in the middle, 1 in a corner
+      const sat = (0.25 + 0.75 * smooth(0.05, 0.5, rad)) * hc.pick;
+      const c = fromLab([0, 1, 2].map(j => lerp(LAB.pale[j], q[j], sat)));
+      cur[0] = c[0]; cur[1] = c[1]; cur[2] = c[2];
+    }
+
+    // ---------- each frame: where each dot is, and whether it is lit ----------
+    let litCount = 0, lastEnv = 0;
+    const cx = new Float32Array(8), cy = new Float32Array(8), cInv = new Float32Array(8), cAmp = new Float32Array(8), cFz = new Float32Array(8);
+    const rx = new Float32Array(4), ry = new Float32Array(4), rR = new Float32Array(4), rA = new Float32Array(4);
+    function compute(now) {
+      const still = motion.matches, dt = hs.dt;
+      colourNow();
+      const env = still ? 0.55 : envelope(now); lastEnv = env;
+      const bl = CFG.floor + (1 - CFG.floor) * env;
+      // the clouds: the live one, and any older ones still fading away
+      let nC = 0;
+      const addCloud = (c, s) => {
+        const R = CFG.radius * W * (CFG.restRadius + (1 - CFG.restRadius) * c.pick);
+        cx[nC] = c.x; cy[nC] = c.y; cInv[nC] = 1 / R; cAmp[nC] = (CFG.restAmp + (CFG.pickAmp - CFG.restAmp) * c.pick) * s; cFz[nC] = c.pick * s; nC++;
+      };
+      addCloud(hc, hc.s);
+      for (let j = 0; j < ghosts.length && nC < 8; j++) addCloud(ghosts[j], ghosts[j].s);
+      let nR = 0;
+      for (let j = 0; j < rings.length && nR < 4; j++) {
+        const age = now - rings[j].t0;
+        rx[nR] = rings[j].x; ry[nR] = rings[j].y; rR[nR] = CFG.ringSpeed * age; rA[nR] = CFG.ringAmp * Math.exp(-age / CFG.ringFade) * (1 - Math.exp(-age / 0.04)); nR++;
+      }
+      const w2 = 1 / (CFG.ringWidth * CFG.ringWidth), reach = CFG.fuzzReach, reach2 = reach * reach;
+      const trail = still ? 0 : smooth(CFG.trailMin, CFG.trailMax, hc.sp), ed = Math.exp(-dt / CFG.trailFade);
+      const kIn = still ? 1 : 1 - Math.exp(-dt / CFG.fuzzIn), kOut = still ? 1 : 1 - Math.exp(-dt / CFG.fuzzOut);
+      const mIn = 1 - Math.exp(-dt / CFG.driftIn), mOut = 1 - Math.exp(-dt / CFG.driftOut);
+      const dReach = CFG.driftReach, dReach2 = dReach * dReach, halo = CFG.driftHalo, dc = hs.dc;
+      const driftPx = still ? 0 : CFG.drift * P * (0.65 + 0.35 * (1 - Math.min(1, env))); // a little quieter right on a beat
+      const fuzzPx = CFG.fuzz * P, maxShift = CFG.maxShift * P;
+      const breath = still ? 1 : 0.88 + 0.24 * Math.min(1, env);
+      const falloff = CFG.falloff, edge = CFG.edge, tw = still ? 0 : CFG.twinkle, litSize = CFG.litSize, base = restD;
+      const tnow = still ? 0 : now;
+      const [cr, cg, cb] = cur;
+      litCount = 0;
+      for (let i = 0, o = 0; i < N; i++, o += 8) {
+        const x = bx[i], y = by[i], n = nz[i];
+        let I = 0, F = 0, M = 0;
+        for (let j = 0; j < nC; j++) {
+          const dx = (x - cx[j]) * cInv[j], dy = (y - cy[j]) * cInv[j], d2 = dx * dx + dy * dy;
+          if (d2 >= 4) continue;
+          I += Math.exp(-falloff * d2) * (1 + 0.3 * n) * cAmp[j];
+          if (cFz[j] > 0.01 && d2 < dReach2) {
+            const d = Math.sqrt(d2);
+            if (d2 < reach2) { const f = cFz[j] * (1 - smooth(0.15, reach, d)); if (f > F) F = f; }
+            const w = cFz[j] * halo * (1 - smooth(0.9, dReach, d)); if (w > M) M = w;
+          }
+        }
+        if (F > M) M = F;
+        I *= bl;
+        let Ir = 0;
+        for (let j = 0; j < nR; j++) { const d = Math.hypot(x - rx[j], y - ry[j]) - rR[j]; if (d < 100 && d > -100) Ir += rA[j] * Math.exp(-d * d * w2) * (0.75 + 0.35 * n); }
+        const total = I + Ir;
+        // dragging leaves embers: dots the cloud has just passed stay lit for a moment, then drop out one by one
+        let e = em[i] * ed;
+        if (trail > 0 && I * trail * 0.75 > e) { e = I * trail * 0.75; ecol[3 * i] = cr; ecol[3 * i + 1] = cg; ecol[3 * i + 2] = cb; }
+        em[i] = e;
+        const lit = Math.max(total, e);
+        const t = th[i] + tw * Math.sin(tf[i] * tnow + tp[i]);
+        let l = clamp((lit - t + edge) / (2 * edge), 0, 1); l = l * l * (3 - 2 * l);
+        const bright = 0.62 + 0.38 * Math.min(1, lit), warm = l;   // a dot is either lit or not; the fringe is just dimmer
+        if (warm > 0.5) litCount++;
+        // loosening: dots drift from their place, quickly when touched and slowly back afterwards
+        fz[i] += (F - fz[i]) * (F > fz[i] ? kIn : kOut);
+        const m = fz[i] * fuzzPx * breath;
+        let wx = 0, wy = 0;
+        mv[i] += (M - mv[i]) * (M > mv[i] ? mIn : mOut);
+        if (mv[i] > 0.004 && driftPx > 0) {
+          const q = 8 * i, a = mv[i] * driftPx;
+          wx = a * (0.65 * Math.sin(dc * dr[q] + dr[q + 1]) + 0.35 * Math.sin(dc * dr[q + 4] + dr[q + 5]));
+          wy = a * (0.65 * Math.sin(dc * dr[q + 2] + dr[q + 3]) + 0.35 * Math.sin(dc * dr[q + 6] + dr[q + 7]));
+        }
+        out[o] = x + clamp(gx[i] * m + wx, -maxShift, maxShift); out[o + 1] = y + clamp(gy[i] * m + wy, -maxShift, maxShift);
+        out[o + 2] = base * szv[i] * (1 + litSize * warm); out[o + 3] = vig[i]; out[o + 4] = warm;
+        if (e > total) { out[o + 5] = ecol[3 * i] * bright; out[o + 6] = ecol[3 * i + 1] * bright; out[o + 7] = ecol[3 * i + 2] * bright; }
+        else { out[o + 5] = cr * bright; out[o + 6] = cg * bright; out[o + 7] = cb * bright; }
+      }
+    }
+
+    // ---------- drawing: WebGL points, or plain canvas if WebGL is missing ----------
+    function makeRenderer() {
+      const gl = canvas.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: true, powerPreference: 'low-power' });
+      const c0 = CFG.colour, bg = CFG.bg;
+      if (gl) {
+        const vs = `attribute vec2 aPos;attribute float aSize;attribute float aAlpha;attribute float aWarm;attribute vec3 aCol;
+          uniform vec2 uView;uniform float uDpr;varying float vAlpha;varying float vWarm;varying float vPx;varying vec3 vCol;
+          void main(){gl_Position=vec4(aPos.x/uView.x*2.0-1.0,1.0-aPos.y/uView.y*2.0,0.0,1.0);
+            vPx=aSize*uDpr;gl_PointSize=vPx+2.0;vAlpha=aAlpha;vWarm=aWarm;vCol=aCol;}`;
+        // Every dot is a flat disc with a one-pixel edge.
+        const fs = `precision mediump float;varying float vAlpha;varying float vWarm;varying float vPx;varying vec3 vCol;
+          uniform vec3 uC0;
+          void main(){float d=length(gl_PointCoord*2.0-1.0)*(vPx+2.0)*0.5;
+            float a=vAlpha*clamp(vPx*0.5-d+0.5,0.0,1.0);
+            gl_FragColor=vec4(mix(uC0,vCol,vWarm)*a,a);}`;
+        const shader = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+        try {
+          const prog = gl.createProgram();
+          gl.attachShader(prog, shader(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(prog);
+          if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+          gl.useProgram(prog);
+          const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+          const attr = (name, size, offset) => { const loc = gl.getAttribLocation(prog, name); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 32, offset); };
+          attr('aPos', 2, 0); attr('aSize', 1, 8); attr('aAlpha', 1, 12); attr('aWarm', 1, 16); attr('aCol', 3, 20);
+          const uView = gl.getUniformLocation(prog, 'uView'), uDpr = gl.getUniformLocation(prog, 'uDpr');
+          gl.uniform3f(gl.getUniformLocation(prog, 'uC0'), c0[0] / 255, c0[1] / 255, c0[2] / 255);
+          gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+          gl.clearColor(bg[0] / 255, bg[1] / 255, bg[2] / 255, 1);
+          let capacity = 0;
+          return {
+            kind: 'webgl',
+            resize() { gl.viewport(0, 0, canvas.width, canvas.height); gl.uniform2f(uView, W, Hgt); gl.uniform1f(uDpr, dpr); },
+            draw() {
+              gl.clear(gl.COLOR_BUFFER_BIT);
+              if (out.length > capacity) { gl.bufferData(gl.ARRAY_BUFFER, out, gl.DYNAMIC_DRAW); capacity = out.length; }
+              else gl.bufferSubData(gl.ARRAY_BUFFER, 0, out);
+              gl.drawArrays(gl.POINTS, 0, N);
+            }
+          };
+        } catch (_) { /* fall through to plain canvas */ }
+      }
+      const ctx = canvas.getContext('2d');
+      const fill = `rgb(${bg.join(',')})`;
+      return {
+        kind: '2d',
+        resize() { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); },
+        draw() {
+          ctx.fillStyle = fill; ctx.fillRect(0, 0, W, Hgt);
+          // Dots of the same colour and fade are drawn together, so a frame is a handful of fills, not thousands.
+          const groups = new Map();
+          for (let i = 0, o = 0; i < N; i++, o += 8) {
+            const a = out[o + 3]; if (a < 0.02) continue;
+            const key = ((Math.round(a * 6) * 8 + Math.round(out[o + 4] * 7)) * 4096) + Math.round(out[o + 5] * 15) * 256 + Math.round(out[o + 6] * 15) * 16 + Math.round(out[o + 7] * 15);
+            let g = groups.get(key); if (!g) groups.set(key, g = []);
+            g.push(o);
+          }
+          groups.forEach((list, key) => {
+            const c = key % 4096, rest = (key - c) / 4096, a = (rest >> 3) / 6, w = (rest & 7) / 7;
+            const r = (c >> 8) / 15 * 255, g = ((c >> 4) & 15) / 15 * 255, b = (c & 15) / 15 * 255;
+            ctx.fillStyle = `rgba(${Math.round(lerp(c0[0], r, w))},${Math.round(lerp(c0[1], g, w))},${Math.round(lerp(c0[2], b, w))},${a.toFixed(3)})`;
+            ctx.beginPath();
+            for (const o of list) { const rad = out[o + 2] / 2; ctx.moveTo(out[o] + rad, out[o + 1]); ctx.arc(out[o], out[o + 1], rad, 0, 6.2832); }
+            ctx.fill();
+          });
+        }
+      };
+    }
+    let renderer = makeRenderer();
+    heart.dataset.renderer = renderer.kind;
+    // Android can drop the graphics context while the app is in the background. Start again when it returns.
+    canvas.addEventListener('webglcontextlost', e => e.preventDefault());
+    canvas.addEventListener('webglcontextrestored', () => { renderer = makeRenderer(); renderer.resize(); dirty = true; wake(); });
+
+    function render(now) { step(now); compute(now); renderer.draw(); dirty = false; }
+
+    // ---------- choosing ----------
+    function selectionAt(x, y) {
+      const pleasant = clamp(x / W, 0, 1);
+      const energy = y <= yMid ? clamp(0.5 + 0.5 * (yMid - y) / Math.max(1, yMid - yTop), 0, 1)
+                               : clamp(0.5 - 0.5 * (y - yMid) / Math.max(1, yBot - yMid), 0, 1);
+      // Mood Meter cells, 1 to 10, so the next screen can pick words exactly as before.
+      const cellX = clamp(Math.floor(pleasant * 10) + 1, 1, 10), cellY = clamp(Math.floor(energy * 10) + 1, 1, 10);
+      return { pleasant, energy, x: cellX, y: cellY, quadrant: `${cellY >= 6 ? 'high' : 'low'}_${cellX >= 6 ? 'pleasant' : 'unpleasant'}` };
+    }
+    function choose(x, y, first) {
+      const now = clock();
+      const px = clamp(x, 0, W), py = clamp(y, 0, Hgt);
+      const sel = selectionAt(px, py), changed = !selection || selection.quadrant !== sel.quadrant;
+      lastTouch = now;
+      if (first) {
+        // The cloud moves to the touch at once. What was there fades away, one ripple leaves the finger, and the beat follows.
+        if (!motion.matches) {
+          if (hc.s > 0.05) ghosts.push({ x: hc.x, y: hc.y, pick: hc.pick, s: hc.s });
+          if (ghosts.length > 4) ghosts.shift();
+          hc.s = 0.55; hc.pick = Math.max(hc.pick, 0.85);
+          rings.push({ x: px, y: py, t0: now }); if (rings.length > 3) rings.shift();
+          beat(now, CFG.tapAmp); hs.phase = CFG.tapPhase; hs.interval = 1;
+        }
+        hc.x = hc.tx = px; hc.y = hc.ty = py;
+        if (!motion.matches) { hs.e = lerp(hs.e, sel.energy, 0.75); hs.u = lerp(hs.u, 1 - sel.pleasant, 0.75); } // the colour is there from the first flash
+      } else { hc.tx = px; hc.ty = py; }
+      hc.pickT = 1;
+      hs.target = tempoFor(sel.energy); hs.eT = sel.energy; hs.uT = 1 - sel.pleasant;
+      if (changed) {
+        said.textContent = NAMES[sel.quadrant];
+        radios.forEach(r => { r.checked = r.value === sel.quadrant; });
+        if (selection && dragging) buzz(7); // a small tick when a drag crosses into another region
+      }
+      selection = sel;
+      window.moodSelection = selection;
+      next.classList.add('on'); next.setAttribute('aria-disabled', 'false');
+      dirty = true; wake();
+    }
+    function clearChoice() {
+      const now = clock();
+      selection = null; window.moodSelection = null;
+      if (!motion.matches && hc.s > 0.05) ghosts.push({ x: hc.x, y: hc.y, pick: hc.pick, s: hc.s });
+      const h = home(); hc.x = hc.tx = h.x; hc.y = hc.ty = h.y; hc.pick = hc.pickT = 0; hc.s = motion.matches ? 1 : 0.2;
+      hs.target = tempoFor(0.5); hs.eT = 0.5; hs.uT = 0.5; lastTouch = now;
+      next.classList.remove('on'); next.setAttribute('aria-disabled', 'true');
+      radios.forEach(r => { r.checked = false; });
+      said.textContent = '';
+      dirty = true; wake();
+    }
+    function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {} }
+    const local = e => { const r = heart.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+
+    hit.addEventListener('pointerdown', e => {
+      if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      pointer = e.pointerId; dragging = true;
+      try { hit.setPointerCapture(e.pointerId); } catch (_) {}
+      buzz(5);
+      choose(...local(e), true); // the ripple belongs to the first touch only
+    });
+    hit.addEventListener('pointermove', e => { if (e.pointerId === pointer && dragging) choose(...local(e), false); });
+    const release = e => { if (e.pointerId !== pointer) return; pointer = null; dragging = false; lastTouch = clock(); }; // the beat just keeps going
+    hit.addEventListener('pointerup', release);
+    hit.addEventListener('pointercancel', release);
+    hit.addEventListener('contextmenu', e => e.preventDefault());
+
+    radios.forEach(radio => radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      const [energy, feel] = radio.value.split('_');
+      const x = W * (feel === 'pleasant' ? 0.75 : 0.25), y = energy === 'high' ? (yTop + yMid) / 2 : (yMid + yBot) / 2;
+      choose(x, y, true);
+    }));
+    next.addEventListener('click', () => {
+      if (!selection) return;
+      // The word screen is parked for now: this is where it will open, for selection.quadrant.
+      next.classList.add('pressed');
+      setTimeout(() => next.classList.remove('pressed'), 160);
+      heart.dispatchEvent(new CustomEvent('mood:continue', { detail: selection }));
+    });
+    back.addEventListener('click', clearChoice);
+
+    // ---------- the loop: the heart always beats; nothing runs while the app is hidden ----------
+    let raf = 0, lastFrame = 0, paused = false;
+    function loop(ms) {
+      if (paused) { raf = 0; return; }
+      raf = requestAnimationFrame(loop);
+      const now = clock();
+      const busy = dragging || rings.length || ghosts.length || hc.sp > 6 || now - lastTouch < 2;
+      if (ms - lastFrame < 1000 / (busy ? CFG.activeFps : CFG.calmFps) - 2) return; // slow glow needs fewer frames than a touch does
+      lastFrame = ms;
+      if (!motion.matches || dirty) render(now);
+      else { cancelAnimationFrame(raf); raf = 0; } // still field: draw only when something changes
+    }
+    function wake() { if (!raf && !paused && !document.hidden && !testClock) raf = requestAnimationFrame(loop); }
+    // The flow page uses these to put this screen to sleep while another one is showing.
+    window.screenOne = {
+      pause() { paused = true; cancelAnimationFrame(raf); raf = 0; heart.classList.add('off'); },
+      resume() { paused = false; hs.last = null; heart.classList.remove('off'); dirty = true; if (testClock) render(clock()); else wake(); },
+      reset() { clearChoice(); }
+    };
+    if (testClock) {
+      window.__heartFrame = () => render(clock());
+      window.__heartOut = () => ({ out, mv, N });
+      window.__heart = () => ({ bpm: hs.bpm, target: hs.target, e: hs.e, u: hs.u, phase: hs.phase, spawned: hs.spawned, env: lastEnv, cloud: { x: hc.x, y: hc.y, pick: hc.pick, s: hc.s }, ghosts: ghosts.length, rings: rings.length, lit: litCount, colour: cur.map(v => Math.round(v * 255)), pitch: P, dots: N, rest: restD, dspeed: hs.dspeed, renderer: renderer.kind, home: home() });
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { cancelAnimationFrame(raf); raf = 0; }
+      else { hs.last = null; wake(); } // no catching up on beats that happened while hidden
+    });
+    motion.addEventListener && motion.addEventListener('change', () => { dirty = true; wake(); });
+
+    // ---------- fitting the screen ----------
+    const vv = window.visualViewport;
+    function fit() {
+      const usable = vv && Math.abs(vv.scale - 1) < 0.01;
+      document.documentElement.style.setProperty('--app-h', (usable ? vv.height : window.innerHeight) + 'px');
+      document.documentElement.style.setProperty('--app-top', (usable ? Math.max(0, vv.offsetTop) : 0) + 'px');
+      requestAnimationFrame(() => {
+        const old = selection && { ...selection };
+        build();
+        if (old) { // keep the same feeling after a rotation or resize, not the same pixel
+          const y = old.energy >= 0.5 ? yMid - (old.energy - 0.5) / 0.5 * (yMid - yTop) : yMid + (0.5 - old.energy) / 0.5 * (yBot - yMid);
+          choose(old.pleasant * W, y, false); hc.x = hc.tx; hc.y = hc.ty;
+          fz.fill(0); em.fill(0); mv.fill(0);
+        }
+        if (testClock) render(clock());
+      });
+    }
+    if (vv) vv.addEventListener('resize', fit);
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', () => setTimeout(fit, 250));
+    const go = () => { fit(); wake(); };
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(go); else go();
+  })();
+  </script>
+</body>
+</html>

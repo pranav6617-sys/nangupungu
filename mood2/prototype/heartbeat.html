@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#101116">
+  <title>Mood check-in · screen one</title>
+  <style>
+    /* Labels only need eight capital letters, so the font is cut down to a few kilobytes. */
+    @font-face{font-family:"Geist Mono";src:url(geist-mono-labels.woff2) format("woff2");font-weight:100 900;font-display:block}
+    :root{
+      --bg:#101116;          /* graphite */
+      --label:#B0B1B3;       /* silver-grey */
+      --dim:#505157;         /* the forward arrow before a choice */
+      --lavender:#ABA4DF;    /* the forward arrow after a choice */
+      --safe-t:env(safe-area-inset-top,0px);
+      --safe-b:env(safe-area-inset-bottom,0px);
+      --safe-l:env(safe-area-inset-left,0px);
+      --safe-r:env(safe-area-inset-right,0px);
+      color-scheme:dark;
+      -webkit-text-size-adjust:100%;
+      text-size-adjust:100%;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);overscroll-behavior:none}
+    body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+    button{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    :focus-visible{outline:1.5px solid var(--label);outline-offset:4px}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+    /* The whole screen is the field. app-h follows the visible part of the screen. */
+    .heart{position:fixed;left:0;top:var(--app-top,0px);width:100%;height:var(--app-h,100dvh);overflow:hidden;background:var(--bg);touch-action:none}
+    .field{position:absolute;inset:0;width:100%;height:100%;display:block}
+    .hit{position:absolute;inset:0;touch-action:none;cursor:crosshair}
+
+    .axis{position:absolute;font-family:"Geist Mono",ui-monospace,"Roboto Mono",monospace;font-size:11.2px;font-weight:400;line-height:1;letter-spacing:.09em;color:var(--label);white-space:nowrap;pointer-events:none}
+    .axis-high{top:calc(var(--safe-t) + 58px);left:50%;transform:translateX(-50%);padding-left:.09em}
+    .axis-low{bottom:calc(var(--safe-b) + 66px);left:50%;transform:translateX(-50%);padding-left:.09em}
+    .axis-left{left:calc(var(--safe-l) + 10px);top:48%;transform:translateY(-50%)}
+    .axis-right{right:calc(var(--safe-r) + 8px);top:48%;transform:translateY(-50%)}
+
+    .back{position:absolute;z-index:3;top:calc(var(--safe-t) + 2px);left:calc(var(--safe-l) + 6px);width:52px;height:46px;display:grid;place-items:center;color:var(--label)}
+    .back svg{width:22px;height:14px}
+    .next{position:absolute;z-index:3;right:calc(var(--safe-r) + 12px);bottom:calc(var(--safe-b) + 14px);width:61px;height:61px;display:grid;place-items:center;color:var(--dim);transition:color .3s ease,transform .15s ease}
+    .next svg{width:52px;height:52px;overflow:visible}
+    .next.on{color:var(--lavender)}
+    .next.on:active{transform:scale(.95)}
+    .next.pressed{transform:scale(.93)}
+    @media (prefers-reduced-motion:reduce){.next{transition:none!important}}
+  </style>
+</head>
+<body>
+  <main class="heart" id="heart">
+    <canvas class="field" id="field" aria-hidden="true"></canvas>
+    <div class="hit" id="hit" aria-hidden="true"></div>
+
+    <span class="axis axis-high" aria-hidden="true">HIGH</span>
+    <span class="axis axis-low" aria-hidden="true">LOW</span>
+    <span class="axis axis-left" aria-hidden="true">UNPLEASANT</span>
+    <span class="axis axis-right" aria-hidden="true">PLEASANT</span>
+
+    <button class="back" id="back" type="button" aria-label="Back">
+      <svg viewBox="0 0 22 14" aria-hidden="true"><path d="M21 7H1.6M7.4 1.2 1.6 7l5.8 5.8" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="next" id="next" type="button" aria-label="Continue" aria-disabled="true">
+      <svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="25.2" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M15.5 26h20.5M29.5 19.4 36 26l-6.5 6.6" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+
+    <!-- For screen readers: the same choice as four regions, plus the axis names in full. -->
+    <fieldset class="sr-only" id="regions">
+      <legend>How do you feel right now? Energy runs from low at the bottom to high at the top. Pleasantness runs from unpleasant on the left to pleasant on the right.</legend>
+      <label><input type="radio" name="region" value="high_unpleasant"> High energy, unpleasant</label>
+      <label><input type="radio" name="region" value="high_pleasant"> High energy, pleasant</label>
+      <label><input type="radio" name="region" value="low_unpleasant"> Low energy, unpleasant</label>
+      <label><input type="radio" name="region" value="low_pleasant"> Low energy, pleasant</label>
+    </fieldset>
+    <p class="sr-only" id="said" aria-live="polite"></p>
+  </main>
+
+  <script>
+  (() => {
+    'use strict';
+
+    // Starting values from the brief, the mockups and your notes. Tune these on the phone.
+    const CFG = {
+      // the grid
+      columns: 45,          // dots across the width, so the grid looks the same on every phone
+      minPitch: 8, maxPitch: 10.5, // CSS px between dots, kept inside these limits
+      dot: 0.18,            // resting diameter as a share of the gap between dots
+      dotMin: 1.6,          // ...but never thinner than this many CSS px
+      maxDot: 0.55,         // the biggest a dot ever gets, as a share of the gap, so single dots always show
+      colour: [106, 108, 128],    // ordinary dots
+      lavender: [206, 198, 252],  // the brightened crest, and a tap's ripple
+      bg: [16, 17, 22],           // #101116
+      // the heart: one beat is two thumps, a full one then a softer one
+      lowBpm: 40, highBpm: 80,    // beats a minute at the bottom and the top; the steps between are even in ratio
+      tempoEase: 0.35,      // seconds for the tempo to settle after the finger moves
+      styleEase: 0.45,      // seconds for the look of the rings to follow the finger
+      dub: 0.58,            // the second thump, as a share of the first
+      dubGap: 0.27,         // gap between the thumps, as a share of one beat...
+      dubMin: 0.17, dubMax: 0.34, // ...kept between these many seconds
+      chosen: 0.8,          // the beat at a chosen point is this much of the resting beat
+      speedLow: 28, speedHigh: 44, // rows a second the rings travel: heavy at the bottom, quick at the top
+      reach: 0.03,          // how fast a ring fades with distance (smaller = reaches further)
+      // what a ring does to the dots it passes
+      swell: 2.0,           // growth at the crest
+      shrink: 0.9,          // how far dots fall below their resting size behind the crest
+      push: 0.3,            // how far the crest pushes dots outwards, as a share of the gap
+      glow: 0.45,           // how much the crest brightens (0 = steady)
+      attack: 0.04, lead: 0.05, dip: 0.3, // seconds to rise; seconds of dip just before the crest; depth of that dip
+      // how unpleasant looks: the ripples ring on and the timing stays regular. How pleasant looks: one clean ring, looser timing.
+      ringPleasant: { trough: 0.28, ring: 0.12, period: 0.3, loose: 1 },
+      ringUnpleasant: { trough: 0.75, ring: 0.42, period: 0.21, loose: 0.35 },
+      wobble: 0.09,         // how much rings bend out of round, as a share of their distance
+      hrv: 0.05,            // how much one beat's length differs from the next
+      fade: 0.7,            // seconds for rings from the old centre to fade after a tap
+      // a tap
+      tapAmp: 1.7, tapSpeed: 58, tapTint: 0.75, tapCore: 3.4, tapTime: 0.62,
+      maxFps: 60, seed: 0
+    };
+    Object.assign(CFG, window.HEART_CFG || {}); // lets a test page try other values
+    // Tests can step time exactly; on a phone this is just the normal clock.
+    const testClock = typeof window.HEART_CLOCK === 'function';
+    const clock = () => (testClock ? window.HEART_CLOCK() : performance.now()) / 1000;
+    const TAU = Math.PI * 2;
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    const lerp = (a, b, k) => a + (b - a) * k;
+    const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+    // A small seeded random source, so a test can replay exactly the same heart.
+    let seedState = (CFG.seed || Math.floor(Math.random() * 4294967296)) >>> 0;
+    const rand = () => { seedState = (seedState + 0x6D2B79F5) >>> 0; let t = seedState; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const hashAt = (i, j, s) => { let h = Math.imul(i, 374761393) ^ Math.imul(j, 668265263) ^ Math.imul(s, 2147483647); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+    const vnoise = (x, y, s) => { // smooth noise from -1 to 1
+      const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+      const a = hashAt(xi, yi, s), b = hashAt(xi + 1, yi, s), c = hashAt(xi, yi + 1, s), d = hashAt(xi + 1, yi + 1, s);
+      return (lerp(lerp(a, b, u), lerp(c, d, u), v)) * 2 - 1;
+    };
+
+    const heart = document.getElementById('heart'), canvas = document.getElementById('field'), hit = document.getElementById('hit');
+    const next = document.getElementById('next'), back = document.getElementById('back');
+    const said = document.getElementById('said'), radios = [...document.querySelectorAll('input[name=region]')];
+    const axis = { high: document.querySelector('.axis-high'), low: document.querySelector('.axis-low'), left: document.querySelector('.axis-left') };
+    const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const NAMES = { high_unpleasant: 'High energy, unpleasant', high_pleasant: 'High energy, pleasant', low_unpleasant: 'Low energy, unpleasant', low_pleasant: 'Low energy, pleasant' };
+
+    // ---------- the dot grid ----------
+    let W = 0, H = 0, dpr = 1, N = 0, P = 9, restD = 2, maxS = 3;
+    let bx, by, vig, bendA, bendB, jit, out;
+    let yTop = 0, yMid = 0, yBot = 0;
+    let dirty = true;
+
+    function build() {
+      const box = heart.getBoundingClientRect();
+      W = box.width; H = box.height;
+      dpr = Math.min(3, window.devicePixelRatio || 1);
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+      P = clamp(W / CFG.columns, CFG.minPitch, CFG.maxPitch);
+      restD = Math.max(CFG.dotMin, CFG.dot * P);
+      maxS = CFG.maxDot * P / restD; // a swollen dot never gets close to its neighbour
+      const cols = Math.ceil(W / P) + 1, rows = Math.ceil(H / P) + 1;
+      const x0 = (W - (cols - 1) * P) / 2, y0 = (H - (rows - 1) * P) / 2;
+      N = cols * rows;
+      bx = new Float32Array(N); by = new Float32Array(N); vig = new Float32Array(N); out = new Float32Array(N * 5);
+      bendA = new Float32Array(N); bendB = new Float32Array(N); jit = new Float32Array(N);
+      // Each dot sits on a whole device pixel, so a resting dot is the same crisp disc everywhere.
+      const snap = v => (Math.round(v * dpr - 0.5) + 0.5) / dpr;
+      let i = 0;
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++, i++) {
+        const x = snap(x0 + c * P), y = snap(y0 + r * P), u = x / W, v = y / H;
+        bx[i] = x; by[i] = y;
+        // A gentle fade into the background at the perimeter.
+        vig[i] = smooth(-0.01, 0.12, v) * smooth(1.01, 0.88, v) * smooth(-0.015, 0.06, u) * smooth(1.015, 0.94, u);
+        // Two fixed patterns that let a ring run a little early here and a little late there, like water over an uneven bed.
+        bendA[i] = vnoise(c / 9, r / 9, 11) * 1.3; bendB[i] = vnoise(c / 9 + 37.1, r / 9 + 11.3, 29) * 1.3;
+        jit[i] = hashAt(c, r, 7) * 2 - 1; // each dot is a few milliseconds off its neighbours
+      }
+      // Energy is read between the HIGH and LOW labels, with its midpoint on the line of the side labels.
+      const top = heart.getBoundingClientRect().top, mid = r => (r.top + r.bottom) / 2 - top;
+      yTop = mid(axis.high.getBoundingClientRect()); yBot = mid(axis.low.getBoundingClientRect()); yMid = mid(axis.left.getBoundingClientRect());
+      renderer.resize();
+      dirty = true;
+    }
+
+    // ---------- the heart ----------
+    // One thump leaves the heart as a ring. For a dot the ring has reached t seconds ago, the ring's height is
+    // g(t): a short dip, a sharp rise, a quick fall, then ripples that die away. Positive means big, bright and pushed outwards.
+    const TS = 120;  // table steps a second
+    function ringTable(st) {
+      const a = CFG.attack, q = CFG.lead, t0 = a * 1.8, dc = 0.05;
+      const tmax = Math.min(1.5, t0 + st.ring * 3.4 + 0.1), n = Math.ceil((q + tmax) * TS) + 2, tbl = new Float32Array(n);
+      for (let k = 0; k < n; k++) {
+        const t = k / TS - q;
+        let g;
+        if (t < 0) { const s = Math.sin(Math.PI * (t + q) / q); g = -CFG.dip * s * s; }
+        else {
+          const crest = t < a ? 1 - Math.pow(1 - t / a, 2) : Math.exp(-(t - a) / dc);
+          const u = t - t0, tail = u > 0 ? -st.trough * Math.exp(-u / st.ring) * Math.sin(TAU * u / st.period) : 0;
+          g = crest + tail;
+        }
+        tbl[k] = g;
+      }
+      return { tbl, tmax };
+    }
+    const hs = { bpm: 0, target: 0, e: 0.5, eT: 0.5, u: 0.5, uT: 0.5, phase: 0.9, interval: 1, ar: 0, pulses: [], cores: [], last: null, spawned: 0 };
+    const tempoFor = e => CFG.lowBpm * Math.pow(CFG.highBpm / CFG.lowBpm, clamp(e, 0, 1)); // 40 at the bottom, about 57 in the middle, 80 at the top
+    hs.bpm = hs.target = tempoFor(0.5);
+    let marker = null, selection = null, dragging = false, pointer = null;
+    const home = () => ({ x: W / 2, y: yMid });
+
+    function styleNow() {
+      const u = hs.u, A = CFG.ringPleasant, B = CFG.ringUnpleasant;
+      return { trough: lerp(A.trough, B.trough, u), ring: lerp(A.ring, B.ring, u), period: lerp(A.period, B.period, u), loose: lerp(A.loose, B.loose, u) };
+    }
+    function pulse(x, y, t0, amp, speed, st, tint) {
+      const { tbl, tmax } = ringTable(st);
+      const far = Math.max(Math.hypot(x, y), Math.hypot(W - x, y), Math.hypot(x, H - y), Math.hypot(W - x, H - y)) / P * 1.25;
+      const phi = rand() * TAU;
+      hs.pulses.push({ x, y, t0, amp, c: speed, tbl, cp: Math.cos(phi), sp: Math.sin(phi), wr: CFG.wobble * st.loose, wa: 0.9 * st.loose, jt: 0.012 * st.loose, tint, kill: -1, end: t0 + far / speed + tmax + 0.1 });
+      if (hs.pulses.length > 28) hs.pulses.shift();
+    }
+    function beat(t0) {
+      const at = marker || home(), st = styleNow(), speed = CFG.speedLow * Math.pow(CFG.speedHigh / CFG.speedLow, hs.e);
+      const base = marker ? CFG.chosen : 1, vary = () => 1 + 0.16 * st.loose * (rand() * 2 - 1);
+      const gap = clamp(CFG.dubGap * 60 / hs.bpm, CFG.dubMin, CFG.dubMax);
+      pulse(at.x, at.y, t0, base * vary(), speed, st, 0);               // the full thump
+      pulse(at.x, at.y, t0 + gap, base * CFG.dub * vary(), speed, st, 0); // the softer one
+      hs.spawned++;
+      hs.ar = 0.6 * hs.ar + 0.8 * (rand() * 2 - 1);                      // the next beat comes a touch early or late
+      hs.interval = 1 + CFG.hrv * st.loose * hs.ar;
+    }
+    function step(now) {
+      if (hs.last === null) hs.last = now;
+      const dt = clamp(now - hs.last, 0, 0.1); hs.last = now;
+      const k = 1 - Math.exp(-dt / CFG.tempoEase), ks = 1 - Math.exp(-dt / CFG.styleEase);
+      hs.bpm = lerp(hs.bpm, hs.target, k); hs.e = lerp(hs.e, hs.eT, ks); hs.u = lerp(hs.u, hs.uT, ks);
+      if (!motion.matches) {
+        hs.phase += dt * hs.bpm / 60 / hs.interval;
+        if (hs.phase >= 1) { hs.phase -= Math.floor(hs.phase); beat(now - hs.phase * 60 * hs.interval / hs.bpm); }
+      }
+      const np = hs.pulses.length, nc = hs.cores.length;
+      hs.pulses = hs.pulses.filter(p => now < p.end && !(p.kill >= 0 && now - p.kill > CFG.fade));
+      hs.cores = hs.cores.filter(c => now - c.t0 < CFG.tapTime);
+      if (hs.pulses.length !== np || hs.cores.length !== nc) dirty = true;
+    }
+    // A tap: rings already travelling carry on and fade, and the next beat starts from the new point after the tap's own ripple.
+    function handOver(now, phase) {
+      hs.pulses.forEach(p => { if (p.kill < 0) p.kill = now; });
+      hs.phase = phase; hs.interval = 1;
+    }
+
+    // ---------- each frame: size, brightness and position of every dot ----------
+    function compute(now) {
+      const still = motion.matches, live = [];
+      if (!still) {
+        for (const p of hs.pulses) {
+          const age = now - p.t0; if (age < -CFG.lead) continue;
+          const w = p.kill < 0 ? 1 : 1 - smooth(0, CFG.fade, now - p.kill);
+          if (w > 0.003) live.push({ p, age, w: p.amp * w, inv: 1 / p.c, len: p.tbl.length - 1 });
+        }
+      }
+      const cores = still ? [] : hs.cores.map(c => { const age = now - c.t0, k = age / CFG.tapTime; return { x: c.x, y: c.y, a: Math.exp(-age / 0.4) * Math.pow(1 - k, 0.8) }; });
+      const swell = CFG.swell, shrink = CFG.shrink, glow = CFG.glow, reach = CFG.reach, lead = CFG.lead, invP = 1 / P, pushMax = 0.42;
+      const mx = marker ? marker.x : 0, my = marker ? marker.y : 0;
+      for (let i = 0, o = 0; i < N; i++, o += 5) {
+        const x = bx[i], y = by[i], ba = bendA[i], bb = bendB[i], jt = jit[i];
+        let s = 1, warm = 0, neg = 0, ox = 0, oy = 0;
+        for (let j = 0; j < live.length; j++) {
+          const L = live[j], p = L.p, dx = (x - p.x) * invP, dy = (y - p.y) * invP, r = Math.sqrt(dx * dx + dy * dy);
+          const bend = ba * p.cp + bb * p.sp;
+          const t = L.age - (r * (1 + p.wr * bend) + p.wa * bend) * L.inv + p.jt * jt;
+          const idx = (t + lead) * TS; if (idx < 0) continue;
+          const k = idx | 0; if (k >= L.len) continue;
+          const f = idx - k, g = p.tbl[k] + (p.tbl[k + 1] - p.tbl[k]) * f;
+          const h = g * L.w / (1 + reach * r);
+          if (h > 0) { s += swell * h; warm += (glow + p.tint) * h; } else { s += shrink * h; neg += h; }
+          if (r > 0.25) { const m = h / r; ox += dx * m; oy += dy * m; }
+        }
+        for (let j = 0; j < cores.length; j++) { // the dots right under a tap
+          const c = cores[j], dx = (x - c.x) * invP, dy = (y - c.y) * invP, g = c.a * Math.exp(-(dx * dx + dy * dy) / 4.5);
+          s += CFG.tapCore * g; warm += g;
+        }
+        if (still && marker) { // reduced motion: no beat, one steady cluster where the choice is
+          const dx = (x - mx) * invP, dy = (y - my) * invP, g = Math.exp(-(dx * dx + dy * dy) / 3.4);
+          s += 2 * g; warm += 0.6 * g;
+        }
+        const pm = CFG.push * P;
+        out[o] = x + clamp(ox * pm, -pushMax * P, pushMax * P); out[o + 1] = y + clamp(oy * pm, -pushMax * P, pushMax * P);
+        out[o + 2] = restD * clamp(s, 0.3, maxS); out[o + 3] = vig[i] * clamp(1 + 0.7 * neg, 0.45, 1); out[o + 4] = Math.min(1, warm);
+      }
+    }
+
+    // ---------- drawing: WebGL points, or plain canvas if WebGL is missing ----------
+    function makeRenderer() {
+      const gl = canvas.getContext('webgl', { alpha: false, antialias: false, premultipliedAlpha: true, powerPreference: 'low-power' });
+      const [c0, c1] = [CFG.colour, CFG.lavender], bg = CFG.bg;
+      if (gl) {
+        const vs = `attribute vec2 aPos;attribute float aSize;attribute float aAlpha;attribute float aWarm;
+          uniform vec2 uView;uniform float uDpr;varying float vAlpha;varying float vWarm;varying float vPx;
+          void main(){gl_Position=vec4(aPos.x/uView.x*2.0-1.0,1.0-aPos.y/uView.y*2.0,0.0,1.0);
+            vPx=aSize*uDpr;gl_PointSize=vPx+2.0;vAlpha=aAlpha;vWarm=aWarm;}`;
+        // Every dot is a flat disc with a one-pixel edge, so the size does the work, not a glow.
+        const fs = `precision mediump float;varying float vAlpha;varying float vWarm;varying float vPx;
+          uniform vec3 uC0;uniform vec3 uC1;
+          void main(){float d=length(gl_PointCoord*2.0-1.0)*(vPx+2.0)*0.5;
+            float a=vAlpha*clamp(vPx*0.5-d+0.5,0.0,1.0);
+            gl_FragColor=vec4(mix(uC0,uC1,vWarm)*a,a);}`;
+        const shader = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+        try {
+          const prog = gl.createProgram();
+          gl.attachShader(prog, shader(gl.VERTEX_SHADER, vs)); gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(prog);
+          if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
+          gl.useProgram(prog);
+          const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+          const attr = (name, size, offset) => { const loc = gl.getAttribLocation(prog, name); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, 20, offset); };
+          attr('aPos', 2, 0); attr('aSize', 1, 8); attr('aAlpha', 1, 12); attr('aWarm', 1, 16);
+          const uView = gl.getUniformLocation(prog, 'uView'), uDpr = gl.getUniformLocation(prog, 'uDpr');
+          gl.uniform3f(gl.getUniformLocation(prog, 'uC0'), c0[0] / 255, c0[1] / 255, c0[2] / 255);
+          gl.uniform3f(gl.getUniformLocation(prog, 'uC1'), c1[0] / 255, c1[1] / 255, c1[2] / 255);
+          gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+          gl.clearColor(bg[0] / 255, bg[1] / 255, bg[2] / 255, 1);
+          let capacity = 0;
+          return {
+            kind: 'webgl',
+            resize() { gl.viewport(0, 0, canvas.width, canvas.height); gl.uniform2f(uView, W, H); gl.uniform1f(uDpr, dpr); },
+            draw() {
+              gl.clear(gl.COLOR_BUFFER_BIT);
+              if (out.length > capacity) { gl.bufferData(gl.ARRAY_BUFFER, out, gl.DYNAMIC_DRAW); capacity = out.length; }
+              else gl.bufferSubData(gl.ARRAY_BUFFER, 0, out);
+              gl.drawArrays(gl.POINTS, 0, N);
+            }
+          };
+        } catch (_) { /* fall through to plain canvas */ }
+      }
+      const ctx = canvas.getContext('2d');
+      const fill = `rgb(${bg.join(',')})`;
+      return {
+        kind: '2d',
+        resize() { ctx.setTransform(dpr, 0, 0, dpr, 0, 0); },
+        draw() {
+          ctx.fillStyle = fill; ctx.fillRect(0, 0, W, H);
+          // Dots of the same colour and fade are drawn together, so a frame is a handful of fills, not thousands.
+          const groups = new Map();
+          for (let i = 0, o = 0; i < N; i++, o += 5) {
+            const a = out[o + 3]; if (a < 0.02) continue;
+            const key = Math.round(a * 6) * 8 + Math.round(out[o + 4] * 7);
+            let g = groups.get(key); if (!g) groups.set(key, g = []);
+            g.push(o);
+          }
+          groups.forEach((list, key) => {
+            const a = (key >> 3) / 6, w = (key & 7) / 7;
+            ctx.fillStyle = `rgba(${Math.round(lerp(c0[0], c1[0], w))},${Math.round(lerp(c0[1], c1[1], w))},${Math.round(lerp(c0[2], c1[2], w))},${a.toFixed(3)})`;
+            ctx.beginPath();
+            for (const o of list) { const r = out[o + 2] / 2; ctx.moveTo(out[o] + r, out[o + 1]); ctx.arc(out[o], out[o + 1], r, 0, 6.2832); }
+            ctx.fill();
+          });
+        }
+      };
+    }
+    let renderer = makeRenderer();
+    heart.dataset.renderer = renderer.kind;
+    // Android can drop the graphics context while the app is in the background. Start again when it returns.
+    canvas.addEventListener('webglcontextlost', e => e.preventDefault());
+    canvas.addEventListener('webglcontextrestored', () => { renderer = makeRenderer(); renderer.resize(); dirty = true; wake(); });
+
+    function render(now) { step(now); compute(now); renderer.draw(); dirty = false; }
+
+    // ---------- choosing ----------
+    function selectionAt(x, y) {
+      const pleasant = clamp(x / W, 0, 1);
+      const energy = y <= yMid ? clamp(0.5 + 0.5 * (yMid - y) / Math.max(1, yMid - yTop), 0, 1)
+                               : clamp(0.5 - 0.5 * (y - yMid) / Math.max(1, yBot - yMid), 0, 1);
+      // Mood Meter cells, 1 to 10, so the next screen can pick words exactly as before.
+      const cellX = clamp(Math.floor(pleasant * 10) + 1, 1, 10), cellY = clamp(Math.floor(energy * 10) + 1, 1, 10);
+      return { pleasant, energy, x: cellX, y: cellY, quadrant: `${cellY >= 6 ? 'high' : 'low'}_${cellX >= 6 ? 'pleasant' : 'unpleasant'}` };
+    }
+    const TAP_STYLE = { trough: 0.3, ring: 0.12, period: 0.28, loose: 0.7 };
+    function choose(x, y, first) {
+      const now = clock();
+      marker = { x: clamp(x, 0, W), y: clamp(y, 0, H) };
+      const next_ = selectionAt(marker.x, marker.y), changed = !selection || selection.quadrant !== next_.quadrant;
+      if (first && !motion.matches) {
+        // The beat moves to the touch at once, with one bright ripple. The next beat follows the ripple.
+        handOver(now, 0.35);
+        pulse(marker.x, marker.y, now, CFG.tapAmp, CFG.tapSpeed, TAP_STYLE, CFG.tapTint);
+        hs.cores.push({ x: marker.x, y: marker.y, t0: now });
+      }
+      hs.target = tempoFor(next_.energy); hs.eT = next_.energy; hs.uT = 1 - next_.pleasant;
+      if (changed) {
+        said.textContent = NAMES[next_.quadrant];
+        radios.forEach(r => { r.checked = r.value === next_.quadrant; });
+        if (selection && dragging) buzz(7); // a small tick when a drag crosses into another region
+      }
+      selection = next_;
+      window.moodSelection = selection;
+      next.classList.add('on'); next.setAttribute('aria-disabled', 'false');
+      dirty = true; wake();
+    }
+    function clearChoice() {
+      marker = null; selection = null; window.moodSelection = null;
+      handOver(clock(), 0.5);
+      hs.target = tempoFor(0.5); hs.eT = 0.5; hs.uT = 0.5;
+      next.classList.remove('on'); next.setAttribute('aria-disabled', 'true');
+      radios.forEach(r => { r.checked = false; });
+      said.textContent = '';
+      dirty = true; wake();
+    }
+    function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {} }
+    const local = e => { const r = heart.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+
+    hit.addEventListener('pointerdown', e => {
+      if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      pointer = e.pointerId; dragging = true;
+      try { hit.setPointerCapture(e.pointerId); } catch (_) {}
+      buzz(5);
+      choose(...local(e), true); // the ripple belongs to the first touch only
+    });
+    hit.addEventListener('pointermove', e => { if (e.pointerId === pointer && dragging) choose(...local(e), false); });
+    const release = e => { if (e.pointerId !== pointer) return; pointer = null; dragging = false; }; // the beat just keeps going
+    hit.addEventListener('pointerup', release);
+    hit.addEventListener('pointercancel', release);
+    hit.addEventListener('contextmenu', e => e.preventDefault());
+
+    radios.forEach(radio => radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      const [energy, feel] = radio.value.split('_');
+      const x = W * (feel === 'pleasant' ? 0.75 : 0.25), y = energy === 'high' ? (yTop + yMid) / 2 : (yMid + yBot) / 2;
+      choose(x, y, true);
+    }));
+    next.addEventListener('click', () => {
+      if (!selection) return;
+      // The word screen is parked for now: this is where it will open, for selection.quadrant.
+      next.classList.add('pressed');
+      setTimeout(() => next.classList.remove('pressed'), 160);
+      heart.dispatchEvent(new CustomEvent('mood:continue', { detail: selection }));
+    });
+    back.addEventListener('click', clearChoice);
+
+    // ---------- the loop: the heart always beats; nothing runs while the app is hidden ----------
+    let raf = 0, lastFrame = 0;
+    function loop(ms) {
+      raf = requestAnimationFrame(loop);
+      if (ms - lastFrame < 1000 / CFG.maxFps - 2) return; // 120 Hz screens still draw at 60
+      lastFrame = ms;
+      const now = clock();
+      step(now);
+      if (hs.pulses.length || hs.cores.length || dirty) render(now);
+      else if (motion.matches) { cancelAnimationFrame(raf); raf = 0; } // still field: draw only when something changes
+    }
+    function wake() { if (!raf && !document.hidden && !testClock) raf = requestAnimationFrame(loop); }
+    if (testClock) {
+      window.__heartFrame = () => render(clock());
+      window.__heart = () => ({ bpm: hs.bpm, target: hs.target, e: hs.e, u: hs.u, phase: hs.phase, spawned: hs.spawned, pulses: hs.pulses.length, marker, home: home(), pitch: P, rest: restD, renderer: renderer.kind });
+    }
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { cancelAnimationFrame(raf); raf = 0; }
+      else { hs.last = null; wake(); } // no catching up on beats that happened while hidden
+    });
+    motion.addEventListener && motion.addEventListener('change', () => { dirty = true; wake(); });
+
+    // ---------- fitting the screen ----------
+    const vv = window.visualViewport;
+    function fit() {
+      const usable = vv && Math.abs(vv.scale - 1) < 0.01;
+      document.documentElement.style.setProperty('--app-h', (usable ? vv.height : window.innerHeight) + 'px');
+      document.documentElement.style.setProperty('--app-top', (usable ? Math.max(0, vv.offsetTop) : 0) + 'px');
+      requestAnimationFrame(() => {
+        const old = selection && { ...selection };
+        build();
+        if (old) { // keep the same feeling after a rotation or resize, not the same pixel
+          const y = old.energy >= 0.5 ? yMid - (old.energy - 0.5) / 0.5 * (yMid - yTop) : yMid + (0.5 - old.energy) / 0.5 * (yBot - yMid);
+          choose(old.pleasant * W, y, false);
+        }
+        if (testClock) render(clock());
+      });
+    }
+    if (vv) vv.addEventListener('resize', fit);
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', () => setTimeout(fit, 250));
+    const go = () => { fit(); wake(); };
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(go); else go();
+  })();
+  </script>
+</body>
+</html>
